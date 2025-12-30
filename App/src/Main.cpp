@@ -1,7 +1,18 @@
 
-#include <iostream>
+#include "Application.h"
+#include "Utils/Log.h"
 
 int main(int argc, char** argv) {
-	std::cout << "Hello, World!\n";
-	return 0;
+	Log::Init();
+
+	Application app;
+
+	try {
+		app.Run();
+	} catch (const std::exception& e) {
+		LOG_CRITICAL("Exception: {0}", e.what());
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
 }

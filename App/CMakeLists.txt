@@ -30,7 +30,13 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(spdlog)
 
 add_executable(App
+    src/Utils/Log.cpp
+    src/Application.cpp
     src/Main.cpp
+)
+
+target_include_directories(App PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_link_libraries(App
