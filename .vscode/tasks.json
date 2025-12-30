@@ -1,0 +1,21 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build All (Debug)",
+			"type": "shell",
+			"command": "make",
+			"args": ["-j$(nproc)"],
+			"options": {
+				"cwd": "${workspaceFolder}/build-debug"
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"presentation": {
+				"reveal": "always"
+			}
+		}
+	]
+}
