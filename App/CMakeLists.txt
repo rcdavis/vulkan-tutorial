@@ -39,7 +39,10 @@ target_include_directories(App PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+find_package(Vulkan REQUIRED)
+
 target_link_libraries(App
+    Vulkan::Vulkan
     glm::glm
     glfw
     spdlog::spdlog_header_only

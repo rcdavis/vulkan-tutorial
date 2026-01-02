@@ -1,5 +1,5 @@
 
-#include "vulkan/vulkan_raii.hpp"
+#include "vulkan/vulkan.h"
 
 struct GLFWwindow;
 
@@ -16,6 +16,10 @@ private:
 	void MainLoop();
 	void Cleanup();
 
+	// Vulkan creation methods
+	void CreateInstance();
+
 private:
+	VkInstance mInstance;
 	GLFWwindow* mWindow;
 };
