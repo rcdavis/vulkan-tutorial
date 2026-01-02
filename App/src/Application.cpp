@@ -79,6 +79,18 @@ void Application::CreateInstance() {
 		.ppEnabledExtensionNames = glfwExtensions
 	};
 
+	uint32_t extensionCount = 0;
+	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+
+	std::vector<VkExtensionProperties> extensions(extensionCount);
+	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, std::data(extensions));
+
+	LOG_INFO("Extensions available:");
+
+	for (const auto& ext : extensions) {
+		LOG_INFO("  {0}", ext.extensionName);
+	}
+
 	if (const VkResult result = vkCreateInstance(&createInfo, nullptr, &mInstance); result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create Vulkan Instance");
 	}
