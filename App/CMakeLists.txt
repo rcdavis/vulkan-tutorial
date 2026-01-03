@@ -30,6 +30,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(spdlog)
 
 add_executable(App
+    src/Utils/DebugUtils.cpp
     src/Utils/Log.cpp
     src/Application.cpp
     src/Main.cpp

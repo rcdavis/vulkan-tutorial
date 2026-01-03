@@ -1,6 +1,8 @@
 
 #include "vulkan/vulkan.h"
 
+#include <vector>
+
 struct GLFWwindow;
 
 class Application {
@@ -19,7 +21,14 @@ private:
 	// Vulkan creation methods
 	void CreateInstance();
 
+	bool CheckValidationLayerSupport();
+	std::vector<const char*> GetRequiredExtensions();
+
+	void SetupDebugMessenger();
+
 private:
 	VkInstance mInstance;
+
+	VkDebugUtilsMessengerEXT mDebugMessenger;
 	GLFWwindow* mWindow;
 };
