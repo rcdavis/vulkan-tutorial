@@ -47,6 +47,7 @@ void Application::InitWindow() {
 }
 
 void Application::InitVulkan() {
+	volkInitialize();
 	CreateInstance();
 	SetupDebugMessenger();
 }
@@ -62,7 +63,8 @@ void Application::MainLoop() {
 void Application::Cleanup() {
 	if constexpr (EnableValidationLayers) {
 		if (mDebugMessenger != VK_NULL_HANDLE) {
-			DebugUtils::DestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
+			vkDestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
+			//DebugUtils::DestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
 			mDebugMessenger = VK_NULL_HANDLE;
 		}
 	}
@@ -113,6 +115,8 @@ void Application::CreateInstance() {
 	if (const VkResult result = vkCreateInstance(&createInfo, nullptr, &mInstance); result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create Vulkan Instance");
 	}
+
+	volkLoadInstance(mInstance);
 }
 
 bool Application::CheckValidationLayerSupport() {
@@ -176,7 +180,8 @@ void Application::SetupDebugMessenger() {
 		.pUserData = nullptr
 	};
 
-	const VkResult result = DebugUtils::CreateDebugUtilsMessengerEXT(mInstance, &createInfo, nullptr, &mDebugMessenger);
+	//const VkResult result = DebugUtils::CreateDebugUtilsMessengerEXT(mInstance, &createInfo, nullptr, &mDebugMessenger);
+	const VkResult result = vkCreateDebugUtilsMessengerEXT(mInstance, &createInfo, nullptr, &mDebugMessenger);
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to setup debug messenger!");
 	}

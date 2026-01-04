@@ -7,6 +7,7 @@
 				"${workspaceFolder}/build-debug/_deps/glfw-src/include",
 				"${workspaceFolder}/build-debug/_deps/glm-src",
 				"${workspaceFolder}/build-debug/_deps/spdlog-src/include",
+				"${workspaceFolder}/build-debug/_deps/volk-src",
 				"/opt/vulkansdk/1.4.335.0/x86_64/include",
 				"${workspaceFolder}/App/include",
 				"/usr/include",

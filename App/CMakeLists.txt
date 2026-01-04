@@ -29,6 +29,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 
+FetchContent_Declare(
+    volk
+    GIT_REPOSITORY https://github.com/zeux/volk.git
+    GIT_TAG 1.4.304
+)
+FetchContent_MakeAvailable(volk)
+
 add_executable(App
     src/Utils/DebugUtils.cpp
     src/Utils/Log.cpp
@@ -51,6 +58,7 @@ target_include_directories(App PUBLIC
 find_package(Vulkan REQUIRED)
 
 target_link_libraries(App
+    volk
     Vulkan::Vulkan
     glm::glm
     glfw
