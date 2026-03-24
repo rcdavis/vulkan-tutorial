@@ -29,8 +29,23 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 
+FetchContent_Declare(
+    volk
+    GIT_REPOSITORY https://github.com/zeux/volk.git
+    GIT_TAG 1.4.304
+)
+FetchContent_MakeAvailable(volk)
+
+FetchContent_Declare(
+    vma
+    GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+    GIT_TAG v3.3.0
+)
+FetchContent_MakeAvailable(vma)
+
 add_executable(App
     src/Utils/Log.cpp
+    src/Utils/VkUtils.cpp
     src/Application.cpp
     src/Main.cpp
 )
@@ -55,7 +70,12 @@ target_include_directories(App PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+find_package(Vulkan REQUIRED)
+
 target_link_libraries(App
+    Vulkan::Vulkan
+    volk
+    VulkanMemoryAllocator
     glm::glm
     glfw
     spdlog::spdlog_header_only
