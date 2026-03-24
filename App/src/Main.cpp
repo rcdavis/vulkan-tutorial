@@ -1,7 +1,12 @@
 
-#include <iostream>
+#include "Utils/Log.h"
+#include "Application.h"
 
 int main(int argc, char** argv) {
-	std::cout << "Hello, World!\n";
+	Log::Init();
+
+	Application app;
+	app.Run();
+
 	return 0;
 }

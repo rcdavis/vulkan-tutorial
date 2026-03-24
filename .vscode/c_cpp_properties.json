@@ -4,13 +4,37 @@
 		{
 			"name": "Linux (Debug)",
 			"includePath": [
+				"${workspaceFolder}/build-linux-debug/_deps/spdlog-src/include/",
+				"${workspaceFolder}/build-linux-debug/_deps/glfw-src/include/",
+				"${workspaceFolder}/build-linux-debug/_deps/glm-src/",
+				"${workspaceFolder}/App/include",
 				"/usr/include",
 				"/usr/local/include"
 			],
 			"defines": [
 				"DEBUG",
 				"GLFW_INCLUDE_NONE",
-				"LOGGING_ENABLED"
+				"LOGGING_ENABLED",
+				"ASSERTS_ENABLED"
+			],
+			"compilerPath": "/usr/bin/gcc",
+			"cStandard": "c17",
+			"cppStandard": "c++17",
+			"intelliSenseMode": "linux-gcc-x64"
+		},
+		{
+			"name": "Linux (Release)",
+			"includePath": [
+				"${workspaceFolder}/build-linux-release/_deps/spdlog-src/include/",
+				"${workspaceFolder}/build-linux-release/_deps/glfw-src/include/",
+				"${workspaceFolder}/build-linux-release/_deps/glm-src/",
+				"${workspaceFolder}/App/include",
+				"/usr/include",
+				"/usr/local/include"
+			],
+			"defines": [
+				"NDEBUG",
+				"GLFW_INCLUDE_NONE"
 			],
 			"compilerPath": "/usr/bin/gcc",
 			"cStandard": "c17",
