@@ -31,6 +31,7 @@ FetchContent_MakeAvailable(spdlog)
 
 add_executable(App
     src/Utils/Log.cpp
+    src/Application.cpp
     src/Main.cpp
 )
 

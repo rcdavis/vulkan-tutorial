@@ -2,7 +2,7 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Game (Linux Debug)",
+			"name": "App (Linux Debug)",
 			"type": "cppdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/build-linux-debug/App/App",
@@ -23,7 +23,7 @@
 			"preLaunchTask": "Build All (Linux Debug)"
 		},
 		{
-			"name": "Game (Linux Release)",
+			"name": "App (Linux Release)",
 			"type": "cppdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/build-linux-release/App/App",

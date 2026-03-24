@@ -1,10 +1,12 @@
 
 #include "Utils/Log.h"
+#include "Application.h"
 
 int main(int argc, char** argv) {
 	Log::Init();
 
-	LOG_INFO("Hello, World!");
+	Application app;
+	app.Run();
 
 	return 0;
 }
