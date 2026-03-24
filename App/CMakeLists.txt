@@ -45,6 +45,7 @@ FetchContent_MakeAvailable(vma)
 
 add_executable(App
     src/Utils/Log.cpp
+    src/Utils/VkUtils.cpp
     src/Application.cpp
     src/Main.cpp
 )
