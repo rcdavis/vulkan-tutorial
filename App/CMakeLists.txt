@@ -33,6 +33,22 @@ add_executable(App
     src/Main.cpp
 )
 
+target_compile_definitions(App PUBLIC
+    GLFW_INCLUDE_NONE
+)
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_definitions(App PUBLIC
+        DEBUG
+        LOGGING_ENABLED
+        ASSERTS_ENABLED
+    )
+else()
+    target_compile_definitions(App PUBLIC
+        NDEBUG
+    )
+endif()
+
 target_link_libraries(App
     glm::glm
     glfw
