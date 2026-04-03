@@ -2,12 +2,15 @@ project(App)
 
 include(FetchContent)
 
+set(SDL_TEST OFF CACHE BOOL "" FORCE)
+set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+
 FetchContent_Declare(
-    glfw
-    GIT_REPOSITORY https://github.com/glfw/glfw.git
-    GIT_TAG 3.4
+    SDL3
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+    GIT_TAG release-3.4.2
 )
-FetchContent_MakeAvailable(glfw)
+FetchContent_MakeAvailable(SDL3)
 
 FetchContent_Declare(
     glm
@@ -72,11 +75,11 @@ target_include_directories(App PUBLIC
 
 find_package(Vulkan REQUIRED)
 
-target_link_libraries(App
+target_link_libraries(App PRIVATE
+    SDL3::SDL3
     Vulkan::Vulkan
     volk
     VulkanMemoryAllocator
     glm::glm
-    glfw
     spdlog::spdlog_header_only
 )
