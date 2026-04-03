@@ -7,7 +7,9 @@ Application::~Application() {
 }
 
 void Application::Run() {
-	Init();
+	if (!Init()) {
+		return;
+	}
 
 	LOG_INFO("Application is running!");
 	MainLoop();
@@ -15,22 +17,26 @@ void Application::Run() {
 	//Shutdown();
 }
 
-void Application::Init() {
+bool Application::Init() {
 	if (volkInitialize() != VK_SUCCESS) {
 		LOG_ERROR("Failed to initialize volk!");
+		return false;
 	}
 
 	if (!SDL_Init(SDL_INIT_VIDEO)) {
 		LOG_ERROR("Failed to initialize SDL: {}", SDL_GetError());
+		return false;
 	}
 
 	if (!SDL_CreateWindowAndRenderer("Vulkan Tutorial", WIDTH, HEIGHT, SDL_WINDOW_VULKAN, &mWindow, &mRenderer)) {
 		LOG_ERROR("Failed to create SDL window and/or renderer: {}", SDL_GetError());
+		return false;
 	}
 
 	mIsRunning = true;
 
 	LOG_INFO("Application initialized successfully!");
+	return true;
 }
 
 void Application::Shutdown() {

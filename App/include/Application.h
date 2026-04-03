@@ -16,7 +16,7 @@ public:
 	void Run();
 
 private:
-	void Init();
+	bool Init();
 	void Shutdown();
 
 	void MainLoop();
