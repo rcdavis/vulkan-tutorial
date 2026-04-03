@@ -24,16 +24,22 @@ void Application::Init() {
 		LOG_ERROR("Failed to initialize SDL: {}", SDL_GetError());
 	}
 
-	mWindow = SDL_CreateWindow("Vulkan Tutorial", 800, 600, SDL_WINDOW_VULKAN);
-	if (!mWindow) {
-		LOG_ERROR("Failed to create SDL window: {}", SDL_GetError());
+	if (!SDL_CreateWindowAndRenderer("Vulkan Tutorial", WIDTH, HEIGHT, SDL_WINDOW_VULKAN, &mWindow, &mRenderer)) {
+		LOG_ERROR("Failed to create SDL window and/or renderer: {}", SDL_GetError());
 	}
 
 	mIsRunning = true;
+
+	LOG_INFO("Application initialized successfully!");
 }
 
 void Application::Shutdown() {
 	LOG_INFO("Shutting down application...");
+
+	if (mRenderer) {
+		SDL_DestroyRenderer(mRenderer);
+		mRenderer = nullptr;
+	}
 
 	if (mWindow) {
 		SDL_DestroyWindow(mWindow);
@@ -53,5 +59,14 @@ void Application::MainLoop() {
 				mIsRunning = false;
 			}
 		}
+
+		Render();
 	}
+}
+
+void Application::Render() {
+	SDL_SetRenderDrawColor(mRenderer, 255, 0, 255, 255);
+	SDL_RenderClear(mRenderer);
+
+	SDL_RenderPresent(mRenderer);
 }
