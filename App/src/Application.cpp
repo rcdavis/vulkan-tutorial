@@ -25,30 +25,31 @@ bool Application::Init() {
 	}
 
 	if (!SDL_Vulkan_LoadLibrary(nullptr)) {
-		LOG_ERROR("Failed to load SDL Vulkan library");
+		LOG_ERROR("Failed to load Vulkan library: {}", SDL_GetError());
+		return false;
+	}
+	mVulkanLoaded = true;
+
+	if (!CreateVulkanInstance(mVulkanContext, GetRequiredExtensions())) {
+		LOG_ERROR("Failed to create Vulkan instance!");
 		return false;
 	}
 
-	if (volkInitialize() != VK_SUCCESS) {
-		LOG_ERROR("Failed to initialize volk!");
-		return false;
-	}
-
-	if (!InitVulkanInstance()) {
-		LOG_ERROR("Failed to initialize Vulkan instance!");
-		return false;
-	}
-
-	if constexpr (EnableValidationLayers) {
+	if constexpr (VulkanContext::EnableValidationLayers) {
 		constexpr auto debugCreateInfo = VkUtils::CreateDebugMessengerCreateInfo();
-		if (vkCreateDebugUtilsMessengerEXT(mInstance, &debugCreateInfo, nullptr, &mDebugMessenger) != VK_SUCCESS) {
+		if (vkCreateDebugUtilsMessengerEXT(mVulkanContext.instance, &debugCreateInfo, nullptr, &mDebugMessenger) != VK_SUCCESS) {
 			LOG_ERROR("Failed to create debug utils messenger");
 			return false;
 		}
 	}
 
-	if (!InitDevice()) {
-		LOG_ERROR("Failed to initialize device!");
+	if (!CreateDevice(mVulkanContext)) {
+		LOG_ERROR("Failed to create device!");
+		return false;
+	}
+
+	if (!SDL_Vulkan_GetPresentationSupport(mVulkanContext.instance, mVulkanContext.physicalDevice, mVulkanContext.graphicsQueueFamily)) {
+		LOG_ERROR("Selected queue family does not support presentation!: {}", SDL_GetError());
 		return false;
 	}
 
@@ -66,22 +67,14 @@ bool Application::Init() {
 void Application::Shutdown() {
 	LOG_INFO("Shutting down application...");
 
-	if constexpr (EnableValidationLayers) {
+	if constexpr (VulkanContext::EnableValidationLayers) {
 		if (mDebugMessenger != VK_NULL_HANDLE) {
-			vkDestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
+			vkDestroyDebugUtilsMessengerEXT(mVulkanContext.instance, mDebugMessenger, nullptr);
 			mDebugMessenger = VK_NULL_HANDLE;
 		}
 	}
 
-	if (mDevice != VK_NULL_HANDLE) {
-		vkDestroyDevice(mDevice, nullptr);
-		mDevice = VK_NULL_HANDLE;
-	}
-
-	if (mInstance != VK_NULL_HANDLE) {
-		vkDestroyInstance(mInstance, nullptr);
-		mInstance = VK_NULL_HANDLE;
-	}
+	DestroyVulkanContext(mVulkanContext);
 
 	if (mRenderer) {
 		SDL_DestroyRenderer(mRenderer);
@@ -91,6 +84,11 @@ void Application::Shutdown() {
 	if (mWindow) {
 		SDL_DestroyWindow(mWindow);
 		mWindow = nullptr;
+	}
+
+	if (mVulkanLoaded) {
+		SDL_Vulkan_UnloadLibrary();
+		mVulkanLoaded = false;
 	}
 
 	SDL_Quit();
@@ -118,165 +116,14 @@ void Application::Render() {
 	SDL_RenderPresent(mRenderer);
 }
 
-bool Application::InitVulkanInstance() {
-	constexpr VkApplicationInfo appInfo {
-		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-		.pNext = nullptr,
-		.pApplicationName = "Vulkan Tutorial",
-		.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-		.pEngineName = "No Engine",
-		.engineVersion = VK_MAKE_VERSION(1, 0, 0),
-		.apiVersion = VK_API_VERSION_1_3
-	};
-
-	auto instanceExtensions = GetRequiredExtensions();
-	if (std::empty(instanceExtensions)) {
-		LOG_ERROR("Failed to get SDL Vulkan Instance extensions: {}", SDL_GetError());
-		return false;
-	}
-
-	VkInstanceCreateInfo createInfo {
-		.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-		.pNext = nullptr,
-		.flags = 0,
-		.pApplicationInfo = &appInfo,
-		.enabledLayerCount = 0,
-		.ppEnabledLayerNames = nullptr,
-		.enabledExtensionCount = (uint32_t)std::size(instanceExtensions),
-		.ppEnabledExtensionNames = std::data(instanceExtensions)
-	};
-
-	constexpr auto debugCreateInfo = VkUtils::CreateDebugMessengerCreateInfo();
-	if constexpr (EnableValidationLayers) {
-		if (!CheckValidationLayerSupport()) {
-			LOG_ERROR("Validation layers unavailable");
-			return false;
-		}
-
-		createInfo.pNext = &debugCreateInfo;
-		createInfo.enabledLayerCount = (uint32_t)std::size(ValidationLayers);
-		createInfo.ppEnabledLayerNames = std::data(ValidationLayers);
-	}
-
-	if (vkCreateInstance(&createInfo, nullptr, &mInstance) != VK_SUCCESS) {
-		LOG_ERROR("Failed to create Vulkan instance!");
-		return false;
-	}
-
-	volkLoadInstance(mInstance);
-	return true;
-}
-
-bool Application::InitDevice() {
-	mPhysicalDevice = VkUtils::GetSuitablePhysicalDevice(mInstance);
-	if (mPhysicalDevice == VK_NULL_HANDLE) {
-		LOG_ERROR("Failed to find suitable physical device!");
-		return false;
-	}
-
-	uint32_t queueFamily = std::numeric_limits<uint32_t>::max();
-	const auto queueFamilies = VkUtils::GetQueueFamilyProperties(mPhysicalDevice);
-	for (int i = 0; i < std::size(queueFamilies); i++) {
-		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-			queueFamily = i;
-			break;
-		}
-	}
-
-	if (queueFamily == std::numeric_limits<uint32_t>::max()) {
-		LOG_ERROR("Failed to find suitable queue family with graphics support!");
-		return false;
-	}
-
-	if (!SDL_Vulkan_GetPresentationSupport(mInstance, mPhysicalDevice, queueFamily)) {
-		LOG_ERROR("Selected queue family does not support presentation!: {}", SDL_GetError());
-		return false;
-	}
-
-	constexpr float queuePriority = 1.0f;
-	const VkDeviceQueueCreateInfo queueCreateInfo {
-		.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-		.pNext = nullptr,
-		.flags = 0,
-		.queueFamilyIndex = queueFamily,
-		.queueCount = 1,
-		.pQueuePriorities = &queuePriority
-	};
-
-	constexpr std::array deviceExtensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME
-	};
-
-	constexpr VkPhysicalDeviceVulkan12Features deviceFeatures12 {
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-		.pNext = nullptr,
-		.descriptorIndexing = VK_TRUE,
-		.shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
-		.descriptorBindingVariableDescriptorCount = VK_TRUE,
-		.runtimeDescriptorArray = VK_TRUE,
-		.bufferDeviceAddress = VK_TRUE
-	};
-
-	const VkPhysicalDeviceVulkan13Features deviceFeatures13 {
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-		.pNext = (void*)&deviceFeatures12,
-		.synchronization2 = VK_TRUE,
-		.dynamicRendering = VK_TRUE
-	};
-
-	constexpr VkPhysicalDeviceFeatures enabledFeatures {
-		.samplerAnisotropy = VK_TRUE
-	};
-
-	const VkDeviceCreateInfo createInfo {
-		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-		.pNext = &deviceFeatures13,
-		.flags = 0,
-		.queueCreateInfoCount = 1,
-		.pQueueCreateInfos = &queueCreateInfo,
-		.enabledLayerCount = 0,
-		.ppEnabledLayerNames = nullptr,
-		.enabledExtensionCount = (uint32_t)std::size(deviceExtensions),
-		.ppEnabledExtensionNames = std::data(deviceExtensions),
-		.pEnabledFeatures = &enabledFeatures
-	};
-
-	if (vkCreateDevice(mPhysicalDevice, &createInfo, nullptr, &mDevice) != VK_SUCCESS) {
-		LOG_ERROR("Failed to create Vulkan device!");
-		return false;
-	}
-
-	vkGetDeviceQueue(mDevice, queueFamily, 0, &mGraphicsQueue);
-
-	return true;
-}
-
 std::vector<const char*> Application::GetRequiredExtensions() {
 	uint32_t count = 0;
 	auto extensions = SDL_Vulkan_GetInstanceExtensions(&count);
 
 	std::vector<const char*> result(extensions, extensions + count);
 
-	if constexpr (EnableValidationLayers)
+	if constexpr (VulkanContext::EnableValidationLayers)
 		result.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
 	return result;
-}
-
-bool Application::CheckValidationLayerSupport() {
-	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
-	for (const char* layerName : ValidationLayers) {
-		bool layerFound = false;
-		for (const auto& layerProps : availableLayers) {
-			if (strcmp(layerName, layerProps.layerName) == 0) {
-				layerFound = true;
-				break;
-			}
-		}
-
-		if (!layerFound)
-			return false;
-	}
-
-	return true;
 }

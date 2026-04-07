@@ -7,6 +7,7 @@ add_executable(App
     src/Main.cpp
     src/VmaImpl.cpp
     src/VolkImpl.cpp
+    src/VulkanContext.cpp
 )
 
 target_compile_definitions(App PUBLIC

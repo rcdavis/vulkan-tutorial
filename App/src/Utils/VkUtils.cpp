@@ -23,29 +23,6 @@ namespace VkUtils {
 		return devices;
 	}
 
-	VkPhysicalDevice GetSuitablePhysicalDevice(VkInstance instance) {
-		const auto devices = GetPhysicalDevices(instance);
-		for (const auto& device : devices) {
-			VkPhysicalDeviceProperties2 deviceProps {
-				.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-				.pNext = nullptr
-			};
-			vkGetPhysicalDeviceProperties2(device, &deviceProps);
-
-			if (deviceProps.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-				LOG_INFO("Selected physical device: {} (discrete GPU)", deviceProps.properties.deviceName);
-				return device;
-			}
-
-			if (deviceProps.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
-				LOG_INFO("Selected physical device: {} (integrated GPU)", deviceProps.properties.deviceName);
-				return device;
-			}
-		}
-
-		return VK_NULL_HANDLE;
-	}
-
 	std::vector<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice device) {
 		uint32_t count = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &count, nullptr);
