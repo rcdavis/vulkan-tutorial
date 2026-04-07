@@ -5,6 +5,8 @@ add_executable(App
     src/Utils/VkUtils.cpp
     src/Application.cpp
     src/Main.cpp
+    src/VmaImpl.cpp
+    src/VolkImpl.cpp
 )
 
 target_compile_definitions(App PUBLIC
