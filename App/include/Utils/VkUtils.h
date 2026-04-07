@@ -7,6 +7,10 @@
 namespace VkUtils {
 	std::vector<VkLayerProperties> GetInstanceLayerProperties();
 
+	std::vector<VkPhysicalDevice> GetPhysicalDevices(VkInstance instance);
+
+	VkPhysicalDevice GetSuitablePhysicalDevice(VkInstance instance);
+
 	VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 		VkDebugUtilsMessageTypeFlagsEXT type,

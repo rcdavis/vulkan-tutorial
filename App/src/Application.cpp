@@ -47,6 +47,11 @@ bool Application::Init() {
 		}
 	}
 
+	if (!InitPhysicalDevice()) {
+		LOG_ERROR("Failed to initialize physical device!");
+		return false;
+	}
+
 	if (!SDL_CreateWindowAndRenderer("Vulkan Tutorial", WIDTH, HEIGHT, SDL_WINDOW_VULKAN, &mWindow, &mRenderer)) {
 		LOG_ERROR("Failed to create SDL window and/or renderer: {}", SDL_GetError());
 		return false;
@@ -154,6 +159,16 @@ bool Application::InitVulkanInstance() {
 	}
 
 	volkLoadInstance(mInstance);
+	return true;
+}
+
+bool Application::InitPhysicalDevice() {
+	mPhysicalDevice = VkUtils::GetSuitablePhysicalDevice(mInstance);
+	if (mPhysicalDevice == VK_NULL_HANDLE) {
+		LOG_ERROR("Failed to find suitable physical device!");
+		return false;
+	}
+
 	return true;
 }
 
