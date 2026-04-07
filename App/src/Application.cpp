@@ -18,13 +18,23 @@ void Application::Run() {
 }
 
 bool Application::Init() {
+	if (!SDL_Init(SDL_INIT_VIDEO)) {
+		LOG_ERROR("Failed to initialize SDL: {}", SDL_GetError());
+		return false;
+	}
+
+	if (!SDL_Vulkan_LoadLibrary(nullptr)) {
+		LOG_ERROR("Failed to load SDL Vulkan library");
+		return false;
+	}
+
 	if (volkInitialize() != VK_SUCCESS) {
 		LOG_ERROR("Failed to initialize volk!");
 		return false;
 	}
 
-	if (!SDL_Init(SDL_INIT_VIDEO)) {
-		LOG_ERROR("Failed to initialize SDL: {}", SDL_GetError());
+	if (!InitVulkanInstance()) {
+		LOG_ERROR("Failed to initialize Vulkan instance!");
 		return false;
 	}
 
@@ -41,6 +51,11 @@ bool Application::Init() {
 
 void Application::Shutdown() {
 	LOG_INFO("Shutting down application...");
+
+	if (mInstance != VK_NULL_HANDLE) {
+		vkDestroyInstance(mInstance, nullptr);
+		mInstance = VK_NULL_HANDLE;
+	}
 
 	if (mRenderer) {
 		SDL_DestroyRenderer(mRenderer);
@@ -75,4 +90,38 @@ void Application::Render() {
 	SDL_RenderClear(mRenderer);
 
 	SDL_RenderPresent(mRenderer);
+}
+
+bool Application::InitVulkanInstance() {
+	constexpr VkApplicationInfo appInfo {
+		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+		.pNext = nullptr,
+    	.pApplicationName = "Vulkan Tutorial",
+    	.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
+    	.pEngineName = "No Engine",
+    	.engineVersion = VK_MAKE_VERSION(1, 0, 0),
+    	.apiVersion = VK_API_VERSION_1_3
+	};
+
+	uint32_t instanceExtensionsCount = 0;
+	auto instanceExtensions = SDL_Vulkan_GetInstanceExtensions(&instanceExtensionsCount);
+
+	const VkInstanceCreateInfo createInfo {
+		.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+    	.pApplicationInfo = &appInfo,
+    	.enabledLayerCount = 0,
+    	.ppEnabledLayerNames = nullptr,
+    	.enabledExtensionCount = instanceExtensionsCount,
+    	.ppEnabledExtensionNames = instanceExtensions
+	};
+
+	if (vkCreateInstance(&createInfo, nullptr, &mInstance) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create Vulkan instance!");
+		return false;
+	}
+
+	volkLoadInstance(mInstance);
+	return true;
 }
