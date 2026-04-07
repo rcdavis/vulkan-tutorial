@@ -27,6 +27,7 @@ private:
 	void Render();
 
 	bool InitVulkanInstance();
+	bool InitDevice();
 
 	std::vector<const char*> GetRequiredExtensions();
 
@@ -48,6 +49,9 @@ private:
 	SDL_Renderer* mRenderer = nullptr;
 
 	VkInstance mInstance = VK_NULL_HANDLE;
+	VkPhysicalDevice mPhysicalDevice = VK_NULL_HANDLE;
+	VkDevice mDevice = VK_NULL_HANDLE;
+	VkQueue mGraphicsQueue = VK_NULL_HANDLE;
 
 	VkDebugUtilsMessengerEXT mDebugMessenger = VK_NULL_HANDLE;
 
