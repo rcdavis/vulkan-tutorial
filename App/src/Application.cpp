@@ -1,6 +1,7 @@
 #include "Application.h"
 
 #include "Utils/Log.h"
+#include "Utils/VkUtils.h"
 
 Application::~Application() {
 	Shutdown();
@@ -38,6 +39,14 @@ bool Application::Init() {
 		return false;
 	}
 
+	if constexpr (EnableValidationLayers) {
+		constexpr auto debugCreateInfo = VkUtils::CreateDebugMessengerCreateInfo();
+		if (vkCreateDebugUtilsMessengerEXT(mInstance, &debugCreateInfo, nullptr, &mDebugMessenger) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create debug utils messenger");
+			return false;
+		}
+	}
+
 	if (!SDL_CreateWindowAndRenderer("Vulkan Tutorial", WIDTH, HEIGHT, SDL_WINDOW_VULKAN, &mWindow, &mRenderer)) {
 		LOG_ERROR("Failed to create SDL window and/or renderer: {}", SDL_GetError());
 		return false;
@@ -51,6 +60,13 @@ bool Application::Init() {
 
 void Application::Shutdown() {
 	LOG_INFO("Shutting down application...");
+
+	if constexpr (EnableValidationLayers) {
+		if (mDebugMessenger != VK_NULL_HANDLE) {
+			vkDestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
+			mDebugMessenger = VK_NULL_HANDLE;
+		}
+	}
 
 	if (mInstance != VK_NULL_HANDLE) {
 		vkDestroyInstance(mInstance, nullptr);
@@ -96,26 +112,41 @@ bool Application::InitVulkanInstance() {
 	constexpr VkApplicationInfo appInfo {
 		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 		.pNext = nullptr,
-    	.pApplicationName = "Vulkan Tutorial",
-    	.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-    	.pEngineName = "No Engine",
-    	.engineVersion = VK_MAKE_VERSION(1, 0, 0),
-    	.apiVersion = VK_API_VERSION_1_3
+		.pApplicationName = "Vulkan Tutorial",
+		.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
+		.pEngineName = "No Engine",
+		.engineVersion = VK_MAKE_VERSION(1, 0, 0),
+		.apiVersion = VK_API_VERSION_1_3
 	};
 
-	uint32_t instanceExtensionsCount = 0;
-	auto instanceExtensions = SDL_Vulkan_GetInstanceExtensions(&instanceExtensionsCount);
+	auto instanceExtensions = GetRequiredExtensions();
+	if (std::empty(instanceExtensions)) {
+		LOG_ERROR("Failed to get SDL Vulkan Instance extensions: {}", SDL_GetError());
+		return false;
+	}
 
-	const VkInstanceCreateInfo createInfo {
+	VkInstanceCreateInfo createInfo {
 		.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 		.pNext = nullptr,
 		.flags = 0,
-    	.pApplicationInfo = &appInfo,
-    	.enabledLayerCount = 0,
-    	.ppEnabledLayerNames = nullptr,
-    	.enabledExtensionCount = instanceExtensionsCount,
-    	.ppEnabledExtensionNames = instanceExtensions
+		.pApplicationInfo = &appInfo,
+		.enabledLayerCount = 0,
+		.ppEnabledLayerNames = nullptr,
+		.enabledExtensionCount = (uint32_t)std::size(instanceExtensions),
+		.ppEnabledExtensionNames = std::data(instanceExtensions)
 	};
+
+	constexpr auto debugCreateInfo = VkUtils::CreateDebugMessengerCreateInfo();
+	if constexpr (EnableValidationLayers) {
+		if (!CheckValidationLayerSupport()) {
+			LOG_ERROR("Validation layers unavailable");
+			return false;
+		}
+
+		createInfo.pNext = &debugCreateInfo;
+		createInfo.enabledLayerCount = (uint32_t)std::size(ValidationLayers);
+		createInfo.ppEnabledLayerNames = std::data(ValidationLayers);
+	}
 
 	if (vkCreateInstance(&createInfo, nullptr, &mInstance) != VK_SUCCESS) {
 		LOG_ERROR("Failed to create Vulkan instance!");
@@ -123,5 +154,35 @@ bool Application::InitVulkanInstance() {
 	}
 
 	volkLoadInstance(mInstance);
+	return true;
+}
+
+std::vector<const char*> Application::GetRequiredExtensions() {
+	uint32_t count = 0;
+	auto extensions = SDL_Vulkan_GetInstanceExtensions(&count);
+
+	std::vector<const char*> result(extensions, extensions + count);
+
+	if constexpr (EnableValidationLayers)
+		result.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
+	return result;
+}
+
+bool Application::CheckValidationLayerSupport() {
+	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
+	for (const char* layerName : ValidationLayers) {
+		bool layerFound = false;
+		for (const auto& layerProps : availableLayers) {
+			if (strcmp(layerName, layerProps.layerName) == 0) {
+				layerFound = true;
+				break;
+			}
+		}
+
+		if (!layerFound)
+			return false;
+	}
+
 	return true;
 }
