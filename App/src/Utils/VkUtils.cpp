@@ -46,6 +46,16 @@ namespace VkUtils {
 		return VK_NULL_HANDLE;
 	}
 
+	std::vector<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice device) {
+		uint32_t count = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &count, nullptr);
+
+		std::vector<VkQueueFamilyProperties> properties(count);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &count, std::data(properties));
+
+		return properties;
+	}
+
 	VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 		VkDebugUtilsMessageTypeFlagsEXT type,

@@ -47,8 +47,8 @@ bool Application::Init() {
 		}
 	}
 
-	if (!InitPhysicalDevice()) {
-		LOG_ERROR("Failed to initialize physical device!");
+	if (!InitDevice()) {
+		LOG_ERROR("Failed to initialize device!");
 		return false;
 	}
 
@@ -71,6 +71,11 @@ void Application::Shutdown() {
 			vkDestroyDebugUtilsMessengerEXT(mInstance, mDebugMessenger, nullptr);
 			mDebugMessenger = VK_NULL_HANDLE;
 		}
+	}
+
+	if (mDevice != VK_NULL_HANDLE) {
+		vkDestroyDevice(mDevice, nullptr);
+		mDevice = VK_NULL_HANDLE;
 	}
 
 	if (mInstance != VK_NULL_HANDLE) {
@@ -162,12 +167,86 @@ bool Application::InitVulkanInstance() {
 	return true;
 }
 
-bool Application::InitPhysicalDevice() {
+bool Application::InitDevice() {
 	mPhysicalDevice = VkUtils::GetSuitablePhysicalDevice(mInstance);
 	if (mPhysicalDevice == VK_NULL_HANDLE) {
 		LOG_ERROR("Failed to find suitable physical device!");
 		return false;
 	}
+
+	uint32_t queueFamily = std::numeric_limits<uint32_t>::max();
+	const auto queueFamilies = VkUtils::GetQueueFamilyProperties(mPhysicalDevice);
+	for (int i = 0; i < std::size(queueFamilies); i++) {
+		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+			queueFamily = i;
+			break;
+		}
+	}
+
+	if (queueFamily == std::numeric_limits<uint32_t>::max()) {
+		LOG_ERROR("Failed to find suitable queue family with graphics support!");
+		return false;
+	}
+
+	if (!SDL_Vulkan_GetPresentationSupport(mInstance, mPhysicalDevice, queueFamily)) {
+		LOG_ERROR("Selected queue family does not support presentation!: {}", SDL_GetError());
+		return false;
+	}
+
+	constexpr float queuePriority = 1.0f;
+	const VkDeviceQueueCreateInfo queueCreateInfo {
+		.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+		.pNext = nullptr,
+		.flags = 0,
+		.queueFamilyIndex = queueFamily,
+		.queueCount = 1,
+		.pQueuePriorities = &queuePriority
+	};
+
+	constexpr std::array deviceExtensions = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME
+	};
+
+	constexpr VkPhysicalDeviceVulkan12Features deviceFeatures12 {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+		.pNext = nullptr,
+		.descriptorIndexing = VK_TRUE,
+		.shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
+		.descriptorBindingVariableDescriptorCount = VK_TRUE,
+		.runtimeDescriptorArray = VK_TRUE,
+		.bufferDeviceAddress = VK_TRUE
+	};
+
+	const VkPhysicalDeviceVulkan13Features deviceFeatures13 {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+		.pNext = (void*)&deviceFeatures12,
+		.synchronization2 = VK_TRUE,
+		.dynamicRendering = VK_TRUE
+	};
+
+	constexpr VkPhysicalDeviceFeatures enabledFeatures {
+		.samplerAnisotropy = VK_TRUE
+	};
+
+	const VkDeviceCreateInfo createInfo {
+		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+		.pNext = &deviceFeatures13,
+		.flags = 0,
+		.queueCreateInfoCount = 1,
+		.pQueueCreateInfos = &queueCreateInfo,
+		.enabledLayerCount = 0,
+		.ppEnabledLayerNames = nullptr,
+		.enabledExtensionCount = (uint32_t)std::size(deviceExtensions),
+		.ppEnabledExtensionNames = std::data(deviceExtensions),
+		.pEnabledFeatures = &enabledFeatures
+	};
+
+	if (vkCreateDevice(mPhysicalDevice, &createInfo, nullptr, &mDevice) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create Vulkan device!");
+		return false;
+	}
+
+	vkGetDeviceQueue(mDevice, queueFamily, 0, &mGraphicsQueue);
 
 	return true;
 }

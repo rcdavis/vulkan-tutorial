@@ -27,7 +27,7 @@ private:
 	void Render();
 
 	bool InitVulkanInstance();
-	bool InitPhysicalDevice();
+	bool InitDevice();
 
 	std::vector<const char*> GetRequiredExtensions();
 
@@ -50,6 +50,8 @@ private:
 
 	VkInstance mInstance = VK_NULL_HANDLE;
 	VkPhysicalDevice mPhysicalDevice = VK_NULL_HANDLE;
+	VkDevice mDevice = VK_NULL_HANDLE;
+	VkQueue mGraphicsQueue = VK_NULL_HANDLE;
 
 	VkDebugUtilsMessengerEXT mDebugMessenger = VK_NULL_HANDLE;
 
