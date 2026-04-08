@@ -11,8 +11,8 @@
 
 class Application {
 public:
-	constexpr static int WIDTH = 800;
-	constexpr static int HEIGHT = 600;
+	constexpr static int WIDTH = 1280;
+	constexpr static int HEIGHT = 720;
 
 public:
 	Application() = default;
