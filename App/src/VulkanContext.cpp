@@ -153,6 +153,39 @@ bool CreateDevice(VulkanContext& context) {
 
 	vkGetDeviceQueue(context.device, context.graphicsQueueFamily, 0, &context.graphicsQueue);
 
+	const VmaVulkanFunctions vmaVulkanFunctions {
+		.vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+		.vkGetDeviceProcAddr = vkGetDeviceProcAddr,
+		.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties,
+		.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties,
+		.vkAllocateMemory = vkAllocateMemory,
+		.vkFreeMemory = vkFreeMemory,
+		.vkMapMemory = vkMapMemory,
+		.vkUnmapMemory = vkUnmapMemory,
+		.vkFlushMappedMemoryRanges = vkFlushMappedMemoryRanges,
+		.vkInvalidateMappedMemoryRanges = vkInvalidateMappedMemoryRanges,
+		.vkBindBufferMemory = vkBindBufferMemory,
+		.vkBindImageMemory = vkBindImageMemory,
+		.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements,
+		.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements,
+		.vkCreateBuffer = vkCreateBuffer,
+		.vkDestroyBuffer = vkDestroyBuffer,
+		.vkCreateImage = vkCreateImage,
+		.vkDestroyImage = vkDestroyImage
+	};
+
+	VmaAllocatorCreateInfo allocatorCreateInfo {};
+	allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
+	allocatorCreateInfo.physicalDevice = context.physicalDevice;
+	allocatorCreateInfo.device = context.device;
+	allocatorCreateInfo.instance = context.instance;
+	allocatorCreateInfo.pVulkanFunctions = &vmaVulkanFunctions;
+
+	if (vmaCreateAllocator(&allocatorCreateInfo, &context.mAllocator) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create VMA allocator!");
+		return false;
+	}
+
 	return true;
 }
 
@@ -165,6 +198,11 @@ void DestroyVulkanContext(VulkanContext& context) {
 	if (context.instance != VK_NULL_HANDLE) {
 		vkDestroyInstance(context.instance, nullptr);
 		context.instance = VK_NULL_HANDLE;
+	}
+
+	if (context.mAllocator != VK_NULL_HANDLE) {
+		vmaDestroyAllocator(context.mAllocator);
+		context.mAllocator = VK_NULL_HANDLE;
 	}
 
 	context.physicalDevice = VK_NULL_HANDLE;
