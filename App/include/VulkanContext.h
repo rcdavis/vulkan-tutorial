@@ -1,6 +1,7 @@
 #pragma once
 
 #include "volk.h"
+#include "vk_mem_alloc.h"
 
 #include <vector>
 #include <array>
@@ -17,6 +18,8 @@ struct VulkanContext {
 	};
 
 	constexpr static uint32_t InvalidQueueFamily = -1;
+
+	VmaAllocator mAllocator = VK_NULL_HANDLE;
 
 	VkInstance instance = VK_NULL_HANDLE;
 
