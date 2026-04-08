@@ -73,10 +73,9 @@ bool CreateVulkanInstance(VulkanContext& context, const std::vector<const char*>
 bool CreateDevice(VulkanContext& context) {
 	const auto devices = VkUtils::GetPhysicalDevices(context.instance);
 	for (const auto& device : devices) {
-		VkPhysicalDeviceProperties2 deviceProps {
-			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-			.pNext = nullptr
-		};
+		VkPhysicalDeviceProperties2 deviceProps {};
+		deviceProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+
 		vkGetPhysicalDeviceProperties2(device, &deviceProps);
 
 		if (deviceProps.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
