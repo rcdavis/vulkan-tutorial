@@ -22,7 +22,7 @@ static bool CheckValidationLayerSupport() {
 	return true;
 }
 
-bool CreateVulkanInstance(VulkanContext& context, Platform& platform) {
+bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform) {
 	if (volkInitialize() != VK_SUCCESS) {
 		LOG_ERROR("Failed to initialize volk!");
 		return false;
@@ -73,7 +73,7 @@ bool CreateVulkanInstance(VulkanContext& context, Platform& platform) {
 	return true;
 }
 
-bool CreateDevice(VulkanContext& context) {
+bool VulkanContext_CreateDevice(VulkanContext& context) {
 	const auto devices = VkUtils::GetPhysicalDevices(context.instance);
 	for (const auto& device : devices) {
 		VkPhysicalDeviceProperties2 deviceProps {};
@@ -192,7 +192,7 @@ bool CreateDevice(VulkanContext& context) {
 	return true;
 }
 
-void DestroyVulkanContext(VulkanContext& context) {
+void VulkanContext_Destroy(VulkanContext& context) {
 	if (context.surface != VK_NULL_HANDLE) {
 		vkDestroySurfaceKHR(context.instance, context.surface, nullptr);
 		context.surface = VK_NULL_HANDLE;

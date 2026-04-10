@@ -26,7 +26,7 @@ bool Application::Init() {
 		return false;
 	}
 
-	if (!CreateVulkanInstance(mVulkanContext, mPlatform)) {
+	if (!VulkanContext_CreateInstance(mVulkanContext, mPlatform)) {
 		LOG_ERROR("Failed to create Vulkan instance!");
 		return false;
 	}
@@ -39,7 +39,7 @@ bool Application::Init() {
 		}
 	}
 
-	if (!CreateDevice(mVulkanContext)) {
+	if (!VulkanContext_CreateDevice(mVulkanContext)) {
 		LOG_ERROR("Failed to create device!");
 		return false;
 	}
@@ -71,7 +71,7 @@ void Application::Shutdown() {
 		}
 	}
 
-	DestroyVulkanContext(mVulkanContext);
+	VulkanContext_Destroy(mVulkanContext);
 	Platform_Destroy(mPlatform);
 }
 

@@ -33,8 +33,8 @@ struct VulkanContext {
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;
 };
 
-bool CreateVulkanInstance(VulkanContext& context, Platform& platform);
+bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
 
-bool CreateDevice(VulkanContext& context);
+bool VulkanContext_CreateDevice(VulkanContext& context);
 
-void DestroyVulkanContext(VulkanContext& context);
+void VulkanContext_Destroy(VulkanContext& context);
