@@ -3,8 +3,9 @@
 #include "volk.h"
 #include "vk_mem_alloc.h"
 
-#include <vector>
 #include <array>
+
+struct Platform;
 
 struct VulkanContext {
 #ifdef NDEBUG
@@ -23,6 +24,8 @@ struct VulkanContext {
 
 	VkInstance instance = VK_NULL_HANDLE;
 
+	VkSurfaceKHR surface = VK_NULL_HANDLE;
+
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device = VK_NULL_HANDLE;
 
@@ -30,7 +33,7 @@ struct VulkanContext {
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;
 };
 
-bool CreateVulkanInstance(VulkanContext& context, const std::vector<const char*>& instanceExtensions);
+bool CreateVulkanInstance(VulkanContext& context, Platform& platform);
 
 bool CreateDevice(VulkanContext& context);
 

@@ -5,6 +5,7 @@ add_executable(App
     src/Utils/VkUtils.cpp
     src/Application.cpp
     src/Main.cpp
+    src/Platform.cpp
     src/VmaImpl.cpp
     src/VolkImpl.cpp
     src/VulkanContext.cpp

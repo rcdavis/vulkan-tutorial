@@ -1,13 +1,8 @@
 #pragma once
 
 #include "volk.h"
+#include "Platform.h"
 #include "VulkanContext.h"
-
-#include "SDL3/SDL.h"
-#include "SDL3/SDL_vulkan.h"
-
-#include <vector>
-#include <array>
 
 class Application {
 public:
@@ -27,16 +22,11 @@ private:
 	void MainLoop();
 	void Render();
 
-	std::vector<const char*> GetRequiredExtensions();
-
 private:
+	Platform mPlatform {};
 	VulkanContext mVulkanContext {};
-
-	SDL_Window* mWindow = nullptr;
-	SDL_Renderer* mRenderer = nullptr;
 
 	VkDebugUtilsMessengerEXT mDebugMessenger = VK_NULL_HANDLE;
 
 	bool mIsRunning = false;
-	bool mVulkanLoaded = false;
 };

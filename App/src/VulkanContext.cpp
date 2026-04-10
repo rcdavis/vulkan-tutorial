@@ -2,6 +2,7 @@
 
 #include "Utils/VkUtils.h"
 #include "Utils/Log.h"
+#include "Platform.h"
 
 static bool CheckValidationLayerSupport() {
 	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
@@ -21,11 +22,13 @@ static bool CheckValidationLayerSupport() {
 	return true;
 }
 
-bool CreateVulkanInstance(VulkanContext& context, const std::vector<const char*>& instanceExtensions) {
+bool CreateVulkanInstance(VulkanContext& context, Platform& platform) {
 	if (volkInitialize() != VK_SUCCESS) {
 		LOG_ERROR("Failed to initialize volk!");
 		return false;
 	}
+
+	const auto instanceExtensions = Platform_GetRequiredExtensions(platform);
 
 	constexpr VkApplicationInfo appInfo {
 		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -190,6 +193,11 @@ bool CreateDevice(VulkanContext& context) {
 }
 
 void DestroyVulkanContext(VulkanContext& context) {
+	if (context.surface != VK_NULL_HANDLE) {
+		vkDestroySurfaceKHR(context.instance, context.surface, nullptr);
+		context.surface = VK_NULL_HANDLE;
+	}
+
 	if (context.mAllocator != VK_NULL_HANDLE) {
 		vmaDestroyAllocator(context.mAllocator);
 		context.mAllocator = VK_NULL_HANDLE;

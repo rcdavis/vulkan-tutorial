@@ -3,6 +3,8 @@
 #include "Utils/Log.h"
 #include "Utils/VkUtils.h"
 
+#include "SDL3/SDL_vulkan.h"
+
 Application::~Application() {
 	Shutdown();
 }
@@ -19,18 +21,12 @@ void Application::Run() {
 }
 
 bool Application::Init() {
-	if (!SDL_Init(SDL_INIT_VIDEO)) {
-		LOG_ERROR("Failed to initialize SDL: {}", SDL_GetError());
+	if (!Platform_Init(mPlatform, "Vulkan Tutorial", WIDTH, HEIGHT)) {
+		LOG_ERROR("Failed to initialize platform!");
 		return false;
 	}
 
-	if (!SDL_Vulkan_LoadLibrary(nullptr)) {
-		LOG_ERROR("Failed to load Vulkan library: {}", SDL_GetError());
-		return false;
-	}
-	mVulkanLoaded = true;
-
-	if (!CreateVulkanInstance(mVulkanContext, GetRequiredExtensions())) {
+	if (!CreateVulkanInstance(mVulkanContext, mPlatform)) {
 		LOG_ERROR("Failed to create Vulkan instance!");
 		return false;
 	}
@@ -53,8 +49,9 @@ bool Application::Init() {
 		return false;
 	}
 
-	if (!SDL_CreateWindowAndRenderer("Vulkan Tutorial", WIDTH, HEIGHT, SDL_WINDOW_VULKAN, &mWindow, &mRenderer)) {
-		LOG_ERROR("Failed to create SDL window and/or renderer: {}", SDL_GetError());
+	mVulkanContext.surface = Platform_CreateVulkanSurface(mPlatform, mVulkanContext.instance);
+	if (mVulkanContext.surface == VK_NULL_HANDLE) {
+		LOG_ERROR("Failed to create Vulkan surface!");
 		return false;
 	}
 
@@ -75,23 +72,7 @@ void Application::Shutdown() {
 	}
 
 	DestroyVulkanContext(mVulkanContext);
-
-	if (mRenderer) {
-		SDL_DestroyRenderer(mRenderer);
-		mRenderer = nullptr;
-	}
-
-	if (mWindow) {
-		SDL_DestroyWindow(mWindow);
-		mWindow = nullptr;
-	}
-
-	if (mVulkanLoaded) {
-		SDL_Vulkan_UnloadLibrary();
-		mVulkanLoaded = false;
-	}
-
-	SDL_Quit();
+	Platform_Destroy(mPlatform);
 }
 
 void Application::MainLoop() {
@@ -110,20 +91,5 @@ void Application::MainLoop() {
 }
 
 void Application::Render() {
-	SDL_SetRenderDrawColor(mRenderer, 255, 0, 255, 255);
-	SDL_RenderClear(mRenderer);
 
-	SDL_RenderPresent(mRenderer);
-}
-
-std::vector<const char*> Application::GetRequiredExtensions() {
-	uint32_t count = 0;
-	auto extensions = SDL_Vulkan_GetInstanceExtensions(&count);
-
-	std::vector<const char*> result(extensions, extensions + count);
-
-	if constexpr (VulkanContext::EnableValidationLayers)
-		result.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-
-	return result;
 }
