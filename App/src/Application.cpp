@@ -21,7 +21,7 @@ void Application::Run() {
 }
 
 bool Application::Init() {
-	if (!Platform_Init(mPlatform, "Vulkan Tutorial", WIDTH, HEIGHT)) {
+	if (!Platform_Init(mPlatform)) {
 		LOG_ERROR("Failed to initialize platform!");
 		return false;
 	}
@@ -46,6 +46,11 @@ bool Application::Init() {
 
 	if (!SDL_Vulkan_GetPresentationSupport(mVulkanContext.instance, mVulkanContext.physicalDevice, mVulkanContext.graphicsQueueFamily)) {
 		LOG_ERROR("Selected queue family does not support presentation!: {}", SDL_GetError());
+		return false;
+	}
+
+	if (!Platform_CreateWindow(mPlatform, "Vulkan Tutorial", WIDTH, HEIGHT)) {
+		LOG_ERROR("Failed to create window!");
 		return false;
 	}
 

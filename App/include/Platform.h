@@ -12,9 +12,11 @@ struct Platform {
 	bool vulkanLoaded = false;
 };
 
-bool Platform_Init(Platform& platform, const char* title, uint32_t width, uint32_t height);
+bool Platform_Init(Platform& platform);
 
 void Platform_Destroy(Platform& platform);
+
+bool Platform_CreateWindow(Platform& platform, const char* title, uint32_t width, uint32_t height);
 
 VkSurfaceKHR Platform_CreateVulkanSurface(Platform& platform, VkInstance instance);
 
