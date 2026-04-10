@@ -190,6 +190,11 @@ bool CreateDevice(VulkanContext& context) {
 }
 
 void DestroyVulkanContext(VulkanContext& context) {
+	if (context.mAllocator != VK_NULL_HANDLE) {
+		vmaDestroyAllocator(context.mAllocator);
+		context.mAllocator = VK_NULL_HANDLE;
+	}
+
 	if (context.device != VK_NULL_HANDLE) {
 		vkDestroyDevice(context.device, nullptr);
 		context.device = VK_NULL_HANDLE;
@@ -198,11 +203,6 @@ void DestroyVulkanContext(VulkanContext& context) {
 	if (context.instance != VK_NULL_HANDLE) {
 		vkDestroyInstance(context.instance, nullptr);
 		context.instance = VK_NULL_HANDLE;
-	}
-
-	if (context.mAllocator != VK_NULL_HANDLE) {
-		vmaDestroyAllocator(context.mAllocator);
-		context.mAllocator = VK_NULL_HANDLE;
 	}
 
 	context.physicalDevice = VK_NULL_HANDLE;

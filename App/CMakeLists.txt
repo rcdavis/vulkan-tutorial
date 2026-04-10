@@ -10,10 +10,6 @@ add_executable(App
     src/VulkanContext.cpp
 )
 
-target_compile_definitions(App PUBLIC
-    GLFW_INCLUDE_NONE
-)
-
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(App PUBLIC
         DEBUG
