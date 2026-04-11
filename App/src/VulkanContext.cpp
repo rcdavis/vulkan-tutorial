@@ -4,6 +4,10 @@
 #include "Utils/Log.h"
 #include "Platform.h"
 
+static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
+
+static bool VulkanContext_CreateDevice(VulkanContext& context);
+
 static bool CheckValidationLayerSupport() {
 	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
 	for (const char* layerName : VulkanContext::ValidationLayers) {
@@ -20,6 +24,72 @@ static bool CheckValidationLayerSupport() {
 	}
 
 	return true;
+}
+
+bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
+	if (!VulkanContext_CreateInstance(context, platform)) {
+		LOG_ERROR("Failed to create Vulkan instance!");
+		return false;
+	}
+
+	if constexpr (VulkanContext::EnableValidationLayers) {
+		constexpr auto debugCreateInfo = VkUtils::CreateDebugMessengerCreateInfo();
+		if (vkCreateDebugUtilsMessengerEXT(context.instance, &debugCreateInfo, nullptr, &context.debugMessenger) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create debug utils messenger");
+			return false;
+		}
+	}
+
+	if (!VulkanContext_CreateDevice(context)) {
+		LOG_ERROR("Failed to create device!");
+		return false;
+	}
+
+	if (!Platform_CheckPresentationSupport(platform, context.instance, context.physicalDevice, context.graphicsQueueFamily)) {
+		LOG_ERROR("Selected queue family does not support presentation!");
+		return false;
+	}
+
+	context.surface = Platform_CreateVulkanSurface(platform, context.instance);
+	if (context.surface == VK_NULL_HANDLE) {
+		LOG_ERROR("Failed to create Vulkan surface!");
+		return false;
+	}
+
+	return true;
+}
+
+void VulkanContext_Destroy(VulkanContext& context) {
+	if (context.surface != VK_NULL_HANDLE) {
+		vkDestroySurfaceKHR(context.instance, context.surface, nullptr);
+		context.surface = VK_NULL_HANDLE;
+	}
+
+	if (context.mAllocator != VK_NULL_HANDLE) {
+		vmaDestroyAllocator(context.mAllocator);
+		context.mAllocator = VK_NULL_HANDLE;
+	}
+
+	if (context.device != VK_NULL_HANDLE) {
+		vkDestroyDevice(context.device, nullptr);
+		context.device = VK_NULL_HANDLE;
+	}
+
+	if constexpr (VulkanContext::EnableValidationLayers) {
+		if (context.debugMessenger != VK_NULL_HANDLE) {
+			vkDestroyDebugUtilsMessengerEXT(context.instance, context.debugMessenger, nullptr);
+			context.debugMessenger = VK_NULL_HANDLE;
+		}
+	}
+
+	if (context.instance != VK_NULL_HANDLE) {
+		vkDestroyInstance(context.instance, nullptr);
+		context.instance = VK_NULL_HANDLE;
+	}
+
+	context.physicalDevice = VK_NULL_HANDLE;
+	context.graphicsQueue = VK_NULL_HANDLE;
+	context.graphicsQueueFamily = -1;
 }
 
 bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform) {
@@ -190,30 +260,4 @@ bool VulkanContext_CreateDevice(VulkanContext& context) {
 	}
 
 	return true;
-}
-
-void VulkanContext_Destroy(VulkanContext& context) {
-	if (context.surface != VK_NULL_HANDLE) {
-		vkDestroySurfaceKHR(context.instance, context.surface, nullptr);
-		context.surface = VK_NULL_HANDLE;
-	}
-
-	if (context.mAllocator != VK_NULL_HANDLE) {
-		vmaDestroyAllocator(context.mAllocator);
-		context.mAllocator = VK_NULL_HANDLE;
-	}
-
-	if (context.device != VK_NULL_HANDLE) {
-		vkDestroyDevice(context.device, nullptr);
-		context.device = VK_NULL_HANDLE;
-	}
-
-	if (context.instance != VK_NULL_HANDLE) {
-		vkDestroyInstance(context.instance, nullptr);
-		context.instance = VK_NULL_HANDLE;
-	}
-
-	context.physicalDevice = VK_NULL_HANDLE;
-	context.graphicsQueue = VK_NULL_HANDLE;
-	context.graphicsQueueFamily = -1;
 }

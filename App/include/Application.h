@@ -1,6 +1,5 @@
 #pragma once
 
-#include "volk.h"
 #include "Platform.h"
 #include "VulkanContext.h"
 
@@ -25,8 +24,6 @@ private:
 private:
 	Platform mPlatform {};
 	VulkanContext mVulkanContext {};
-
-	VkDebugUtilsMessengerEXT mDebugMessenger = VK_NULL_HANDLE;
 
 	bool mIsRunning = false;
 };

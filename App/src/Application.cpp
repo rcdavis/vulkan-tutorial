@@ -3,8 +3,6 @@
 #include "Utils/Log.h"
 #include "Utils/VkUtils.h"
 
-#include "SDL3/SDL_vulkan.h"
-
 Application::~Application() {
 	Shutdown();
 }
@@ -21,42 +19,13 @@ void Application::Run() {
 }
 
 bool Application::Init() {
-	if (!Platform_Init(mPlatform)) {
+	if (!Platform_Init(mPlatform, "Vulkan Tutorial", WIDTH, HEIGHT)) {
 		LOG_ERROR("Failed to initialize platform!");
 		return false;
 	}
 
-	if (!VulkanContext_CreateInstance(mVulkanContext, mPlatform)) {
-		LOG_ERROR("Failed to create Vulkan instance!");
-		return false;
-	}
-
-	if constexpr (VulkanContext::EnableValidationLayers) {
-		constexpr auto debugCreateInfo = VkUtils::CreateDebugMessengerCreateInfo();
-		if (vkCreateDebugUtilsMessengerEXT(mVulkanContext.instance, &debugCreateInfo, nullptr, &mDebugMessenger) != VK_SUCCESS) {
-			LOG_ERROR("Failed to create debug utils messenger");
-			return false;
-		}
-	}
-
-	if (!VulkanContext_CreateDevice(mVulkanContext)) {
-		LOG_ERROR("Failed to create device!");
-		return false;
-	}
-
-	if (!SDL_Vulkan_GetPresentationSupport(mVulkanContext.instance, mVulkanContext.physicalDevice, mVulkanContext.graphicsQueueFamily)) {
-		LOG_ERROR("Selected queue family does not support presentation!: {}", SDL_GetError());
-		return false;
-	}
-
-	if (!Platform_CreateWindow(mPlatform, "Vulkan Tutorial", WIDTH, HEIGHT)) {
-		LOG_ERROR("Failed to create window!");
-		return false;
-	}
-
-	mVulkanContext.surface = Platform_CreateVulkanSurface(mPlatform, mVulkanContext.instance);
-	if (mVulkanContext.surface == VK_NULL_HANDLE) {
-		LOG_ERROR("Failed to create Vulkan surface!");
+	if (!VulkanContext_Init(mVulkanContext, mPlatform)) {
+		LOG_ERROR("Failed to initialize Vulkan context!");
 		return false;
 	}
 
@@ -68,13 +37,6 @@ bool Application::Init() {
 
 void Application::Shutdown() {
 	LOG_INFO("Shutting down application...");
-
-	if constexpr (VulkanContext::EnableValidationLayers) {
-		if (mDebugMessenger != VK_NULL_HANDLE) {
-			vkDestroyDebugUtilsMessengerEXT(mVulkanContext.instance, mDebugMessenger, nullptr);
-			mDebugMessenger = VK_NULL_HANDLE;
-		}
-	}
 
 	VulkanContext_Destroy(mVulkanContext);
 	Platform_Destroy(mPlatform);

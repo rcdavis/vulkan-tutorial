@@ -24,6 +24,8 @@ struct VulkanContext {
 
 	VkInstance instance = VK_NULL_HANDLE;
 
+	VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
+
 	VkSurfaceKHR surface = VK_NULL_HANDLE;
 
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -33,8 +35,6 @@ struct VulkanContext {
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;
 };
 
-bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
-
-bool VulkanContext_CreateDevice(VulkanContext& context);
+bool VulkanContext_Init(VulkanContext& context, Platform& platform);
 
 void VulkanContext_Destroy(VulkanContext& context);
