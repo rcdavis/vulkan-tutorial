@@ -92,7 +92,7 @@ void VulkanContext_Destroy(VulkanContext& context) {
 	context.graphicsQueueFamily = -1;
 }
 
-bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform) {
+static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform) {
 	if (volkInitialize() != VK_SUCCESS) {
 		LOG_ERROR("Failed to initialize volk!");
 		return false;
@@ -143,7 +143,7 @@ bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform) {
 	return true;
 }
 
-bool VulkanContext_CreateDevice(VulkanContext& context) {
+static bool VulkanContext_CreateDevice(VulkanContext& context) {
 	const auto devices = VkUtils::GetPhysicalDevices(context.instance);
 	for (const auto& device : devices) {
 		VkPhysicalDeviceProperties2 deviceProps {};
