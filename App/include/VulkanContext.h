@@ -4,6 +4,7 @@
 #include "vk_mem_alloc.h"
 
 #include <array>
+#include <vector>
 
 struct Platform;
 
@@ -30,6 +31,12 @@ struct VulkanContext {
 
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device = VK_NULL_HANDLE;
+
+	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+	VkExtent2D swapchainExtent {};
+
+	std::vector<VkImage> swapchainImages;
+	std::vector<VkImageView> swapchainImageViews;
 
 	VkQueue graphicsQueue = VK_NULL_HANDLE;
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;

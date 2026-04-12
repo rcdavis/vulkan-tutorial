@@ -8,6 +8,8 @@ static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platf
 
 static bool VulkanContext_CreateDevice(VulkanContext& context);
 
+static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& platform);
+
 static bool CheckValidationLayerSupport() {
 	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
 	for (const char* layerName : VulkanContext::ValidationLayers) {
@@ -50,9 +52,8 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 		return false;
 	}
 
-	context.surface = Platform_CreateVulkanSurface(platform, context.instance);
-	if (context.surface == VK_NULL_HANDLE) {
-		LOG_ERROR("Failed to create Vulkan surface!");
+	if (!VulkanContext_CreateSwapchain(context, platform)) {
+		LOG_ERROR("Failed to create swapchain!");
 		return false;
 	}
 
@@ -60,6 +61,17 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 }
 
 void VulkanContext_Destroy(VulkanContext& context) {
+	for (VkImageView imageView : context.swapchainImageViews) {
+		vkDestroyImageView(context.device, imageView, nullptr);
+	}
+	context.swapchainImageViews.clear();
+	context.swapchainImages.clear();
+
+	if (context.swapchain != VK_NULL_HANDLE) {
+		vkDestroySwapchainKHR(context.device, context.swapchain, nullptr);
+		context.swapchain = VK_NULL_HANDLE;
+	}
+
 	if (context.surface != VK_NULL_HANDLE) {
 		vkDestroySurfaceKHR(context.instance, context.surface, nullptr);
 		context.surface = VK_NULL_HANDLE;
@@ -257,6 +269,90 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 	if (vmaCreateAllocator(&allocatorCreateInfo, &context.mAllocator) != VK_SUCCESS) {
 		LOG_ERROR("Failed to create VMA allocator!");
 		return false;
+	}
+
+	return true;
+}
+
+static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& platform) {
+	context.surface = Platform_CreateVulkanSurface(platform, context.instance);
+	if (context.surface == VK_NULL_HANDLE) {
+		LOG_ERROR("Failed to create Vulkan surface!");
+		return false;
+	}
+
+	VkSurfaceCapabilitiesKHR surfaceCapabilities {};
+	if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context.physicalDevice, context.surface, &surfaceCapabilities) != VK_SUCCESS) {
+		LOG_ERROR("Failed to get surface capabilities!");
+		return false;
+	}
+
+	context.swapchainExtent = surfaceCapabilities.currentExtent;
+	if (context.swapchainExtent.width == 0xFFFFFFFF) {
+		context.swapchainExtent = {
+			.width = std::clamp(platform.width, surfaceCapabilities.minImageExtent.width, surfaceCapabilities.maxImageExtent.width),
+			.height = std::clamp(platform.height, surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.height)
+		};
+	}
+
+	constexpr VkFormat desiredFormat = VK_FORMAT_B8G8R8A8_SRGB;
+	const VkSwapchainCreateInfoKHR createInfo {
+		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+		.surface = context.surface,
+		.minImageCount = surfaceCapabilities.minImageCount,
+		.imageFormat = desiredFormat,
+		.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+		.imageExtent = context.swapchainExtent,
+		.imageArrayLayers = 1,
+		.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+		.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		.preTransform = surfaceCapabilities.currentTransform,
+		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+		.presentMode = VK_PRESENT_MODE_FIFO_KHR
+	};
+
+	if (vkCreateSwapchainKHR(context.device, &createInfo, nullptr, &context.swapchain) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create swapchain!");
+		return false;
+	}
+
+	uint32_t imageCount = 0;
+	if (vkGetSwapchainImagesKHR(context.device, context.swapchain, &imageCount, nullptr) != VK_SUCCESS) {
+		LOG_ERROR("Failed to get swapchain images!");
+		return false;
+	}
+	context.swapchainImages.resize(imageCount);
+	if (vkGetSwapchainImagesKHR(context.device, context.swapchain, &imageCount, context.swapchainImages.data()) != VK_SUCCESS) {
+		LOG_ERROR("Failed to get swapchain image views!");
+		return false;
+	}
+	context.swapchainImageViews.resize(imageCount);
+
+	for (int i = 0; i < imageCount; i++) {
+		const VkImageViewCreateInfo viewCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.image = context.swapchainImages[i],
+			.viewType = VK_IMAGE_VIEW_TYPE_2D,
+			.format = desiredFormat,
+			.components = {
+				.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+				.g = VK_COMPONENT_SWIZZLE_IDENTITY,
+				.b = VK_COMPONENT_SWIZZLE_IDENTITY,
+				.a = VK_COMPONENT_SWIZZLE_IDENTITY
+			},
+			.subresourceRange = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+		};
+
+		if (vkCreateImageView(context.device, &viewCreateInfo, nullptr, &context.swapchainImageViews[i]) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create swapchain image views!");
+			return false;
+		}
 	}
 
 	return true;
