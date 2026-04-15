@@ -5,9 +5,14 @@ add_executable(App
     src/Utils/VkUtils.cpp
     src/Application.cpp
     src/Main.cpp
+    src/Platform.cpp
     src/VmaImpl.cpp
-    src/VolkImpl.cpp
     src/VulkanContext.cpp
+)
+
+target_compile_definitions(App PRIVATE
+    VMA_STATIC_VULKAN_FUNCTIONS=0
+    VMA_DYNAMIC_VULKAN_FUNCTIONS=1
 )
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")

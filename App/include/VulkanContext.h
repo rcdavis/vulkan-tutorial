@@ -3,8 +3,10 @@
 #include "volk.h"
 #include "vk_mem_alloc.h"
 
-#include <vector>
 #include <array>
+#include <vector>
+
+struct Platform;
 
 struct VulkanContext {
 #ifdef NDEBUG
@@ -19,19 +21,31 @@ struct VulkanContext {
 
 	constexpr static uint32_t InvalidQueueFamily = -1;
 
-	VmaAllocator mAllocator = VK_NULL_HANDLE;
+	VmaAllocator allocator = VK_NULL_HANDLE;
 
 	VkInstance instance = VK_NULL_HANDLE;
 
+	VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
+
+	VkSurfaceKHR surface = VK_NULL_HANDLE;
+
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	VkDevice device = VK_NULL_HANDLE;
+
+	VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+	VkExtent2D swapchainExtent {};
+
+	std::vector<VkImage> swapchainImages;
+	std::vector<VkImageView> swapchainImageViews;
+
+	VkImage depthImage = VK_NULL_HANDLE;
+	VkImageView depthImageView = VK_NULL_HANDLE;
+	VmaAllocation depthImageAllocation = VK_NULL_HANDLE;
 
 	VkQueue graphicsQueue = VK_NULL_HANDLE;
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;
 };
 
-bool CreateVulkanInstance(VulkanContext& context, const std::vector<const char*>& instanceExtensions);
+bool VulkanContext_Init(VulkanContext& context, Platform& platform);
 
-bool CreateDevice(VulkanContext& context);
-
-void DestroyVulkanContext(VulkanContext& context);
+void VulkanContext_Destroy(VulkanContext& context);
