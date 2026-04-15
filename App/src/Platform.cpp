@@ -10,12 +10,6 @@ bool Platform_Init(Platform& platform, const char* title, uint32_t width, uint32
 		return false;
 	}
 
-	if (!SDL_Vulkan_LoadLibrary(nullptr)) {
-		LOG_ERROR("Failed to load Vulkan library: {}", SDL_GetError());
-		return false;
-	}
-	platform.vulkanLoaded = true;
-
 	platform.window = SDL_CreateWindow(title, width, height, SDL_WINDOW_VULKAN);
 	if (!platform.window) {
 		LOG_ERROR("Failed to create SDL window");
@@ -32,11 +26,6 @@ void Platform_Destroy(Platform& platform) {
 	if (platform.window) {
 		SDL_DestroyWindow(platform.window);
 		platform.window = nullptr;
-	}
-
-	if (platform.vulkanLoaded) {
-		SDL_Vulkan_UnloadLibrary();
-		platform.vulkanLoaded = false;
 	}
 
 	platform.width = 0;
