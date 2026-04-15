@@ -5,10 +5,15 @@ add_executable(App
     src/Utils/VkUtils.cpp
     src/Application.cpp
     src/Main.cpp
+    src/Mesh.cpp
     src/Platform.cpp
+    src/TinyObjImpl.cpp
     src/VmaImpl.cpp
     src/VulkanContext.cpp
 )
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/res
+     DESTINATION ${CMAKE_BINARY_DIR}/App)
 
 target_compile_definitions(App PRIVATE
     VMA_STATIC_VULKAN_FUNCTIONS=0
@@ -40,4 +45,5 @@ target_link_libraries(App PRIVATE
     VulkanMemoryAllocator
     glm::glm
     spdlog::spdlog_header_only
+    tinyobjloader
 )

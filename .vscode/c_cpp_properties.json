@@ -9,6 +9,7 @@
 				"${workspaceFolder}/build-linux-debug/_deps/glm-src/",
 				"${workspaceFolder}/build-linux-debug/_deps/volk-src/",
 				"${workspaceFolder}/build-linux-debug/_deps/vma-src/include/",
+				"${workspaceFolder}/build-linux-debug/_deps/tinyobjloader-src/",
 				"${workspaceFolder}/App/include",
 				"/usr/include",
 				"/usr/local/include"
@@ -32,6 +33,7 @@
 				"${workspaceFolder}/build-linux-release/_deps/glm-src/",
 				"${workspaceFolder}/build-linux-release/_deps/volk-src/",
 				"${workspaceFolder}/build-linux-release/_deps/vma-src/include/",
+				"${workspaceFolder}/build-linux-release/_deps/tinyobjloader-src/",
 				"${workspaceFolder}/App/include",
 				"/usr/include",
 				"/usr/local/include"

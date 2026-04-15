@@ -42,6 +42,9 @@ struct VulkanContext {
 	VkImageView depthImageView = VK_NULL_HANDLE;
 	VmaAllocation depthImageAllocation = VK_NULL_HANDLE;
 
+	VkBuffer vertexBuffer = VK_NULL_HANDLE;
+	VmaAllocation vertexBufferAllocation = VK_NULL_HANDLE;
+
 	VkQueue graphicsQueue = VK_NULL_HANDLE;
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;
 };
