@@ -3,12 +3,16 @@
 #include "Utils/VkUtils.h"
 #include "Utils/Log.h"
 #include "Platform.h"
+#include "Mesh.h"
 
 static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
 
 static bool VulkanContext_CreateDevice(VulkanContext& context);
 
 static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& platform);
+
+static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& platform);
+
 
 static bool CheckValidationLayerSupport() {
 	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
@@ -57,10 +61,21 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 		return false;
 	}
 
+	if (!VulkanContext_CreateMeshBuffers(context, platform)) {
+		LOG_ERROR("Failed to create mesh buffers!");
+		return false;
+	}
+
 	return true;
 }
 
 void VulkanContext_Destroy(VulkanContext& context) {
+	if (context.vertexBuffer != VK_NULL_HANDLE) {
+		vmaDestroyBuffer(context.allocator, context.vertexBuffer, context.vertexBufferAllocation);
+		context.vertexBuffer = VK_NULL_HANDLE;
+		context.vertexBufferAllocation = VK_NULL_HANDLE;
+	}
+
 	if (context.depthImageView != VK_NULL_HANDLE) {
 		vkDestroyImageView(context.device, context.depthImageView, nullptr);
 		context.depthImageView = VK_NULL_HANDLE;
@@ -403,6 +418,42 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 
 	if (vkCreateImageView(context.device, &depthViewCI, nullptr, &context.depthImageView) != VK_SUCCESS) {
 		LOG_ERROR("Failed to create depth image view!");
+		return false;
+	}
+
+	return true;
+}
+
+static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& platform) {
+	std::vector<Vertex> vertices;
+	std::vector<uint16_t> indices;
+	if (!Mesh_LoadFromOBJ("res/meshes/suzanne.obj", vertices, indices)) {
+		LOG_ERROR("Failed to load mesh!");
+		return false;
+	}
+
+	const VkDeviceSize vertexBufferSize = sizeof(Vertex) * vertices.size();
+	const VkDeviceSize indexBufferSize = sizeof(uint16_t) * indices.size();
+
+	VkBufferCreateInfo vertexBufferCI {};
+	vertexBufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	vertexBufferCI.size = vertexBufferSize + indexBufferSize;
+	vertexBufferCI.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+
+	constexpr VmaAllocationCreateFlags vertexBufferAllocFlags =
+		VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+		VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT |
+		VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+	VmaAllocationCreateInfo vertexBufferAllocCI {};
+	vertexBufferAllocCI.flags = vertexBufferAllocFlags;
+	vertexBufferAllocCI.usage = VMA_MEMORY_USAGE_AUTO;
+
+	VmaAllocationInfo vertexBufferAllocInfo {};
+	if (vmaCreateBuffer(context.allocator, &vertexBufferCI, &vertexBufferAllocCI,
+		&context.vertexBuffer, &context.vertexBufferAllocation, &vertexBufferAllocInfo) != VK_SUCCESS
+	) {
+		LOG_ERROR("Failed to create vertex buffer!");
 		return false;
 	}
 

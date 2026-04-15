@@ -46,3 +46,10 @@ FetchContent_Declare(
     GIT_TAG v3.3.0
 )
 FetchContent_MakeAvailable(vma)
+
+FetchContent_Declare(
+    tinyobjloader
+    GIT_REPOSITORY https://github.com/tinyobjloader/tinyobjloader.git
+    GIT_TAG release
+)
+FetchContent_MakeAvailable(tinyobjloader)
