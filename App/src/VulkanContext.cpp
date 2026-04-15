@@ -457,5 +457,8 @@ static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& pl
 		return false;
 	}
 
+	memcpy(vertexBufferAllocInfo.pMappedData, vertices.data(), vertexBufferSize);
+	memcpy((uint8_t*)vertexBufferAllocInfo.pMappedData + vertexBufferSize, indices.data(), indexBufferSize);
+
 	return true;
 }
