@@ -61,6 +61,11 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 }
 
 void VulkanContext_Destroy(VulkanContext& context) {
+	if (context.depthImageView != VK_NULL_HANDLE) {
+		vkDestroyImageView(context.device, context.depthImageView, nullptr);
+		context.depthImageView = VK_NULL_HANDLE;
+	}
+
 	if (context.depthImage != VK_NULL_HANDLE) {
 		vmaDestroyImage(context.allocator, context.depthImage, context.depthImageAllocation);
 		context.depthImage = VK_NULL_HANDLE;
@@ -384,6 +389,20 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 
 	if (vmaCreateImage(context.allocator, &depthImageCI, &depthAllocCI, &context.depthImage, &context.depthImageAllocation, nullptr) != VK_SUCCESS) {
 		LOG_ERROR("Failed to create depth texture!");
+		return false;
+	}
+
+	VkImageViewCreateInfo depthViewCI {};
+	depthViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	depthViewCI.image = context.depthImage;
+	depthViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	depthViewCI.format = depthFormat;
+	depthViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	depthViewCI.subresourceRange.levelCount = 1;
+	depthViewCI.subresourceRange.layerCount = 1;
+
+	if (vkCreateImageView(context.device, &depthViewCI, nullptr, &context.depthImageView) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create depth image view!");
 		return false;
 	}
 

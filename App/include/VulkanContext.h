@@ -39,6 +39,7 @@ struct VulkanContext {
 	std::vector<VkImageView> swapchainImageViews;
 
 	VkImage depthImage = VK_NULL_HANDLE;
+	VkImageView depthImageView = VK_NULL_HANDLE;
 	VmaAllocation depthImageAllocation = VK_NULL_HANDLE;
 
 	VkQueue graphicsQueue = VK_NULL_HANDLE;
