@@ -37,6 +37,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(volk)
 
+set(VMA_STATIC_VULKAN_FUNCTIONS ON CACHE BOOL "" FORCE)
+set(VMA_DYNAMIC_VULKAN_FUNCTIONS OFF CACHE BOOL "" FORCE)
+
 FetchContent_Declare(
     vma
     GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git

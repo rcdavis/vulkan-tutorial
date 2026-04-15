@@ -61,6 +61,12 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 }
 
 void VulkanContext_Destroy(VulkanContext& context) {
+	if (context.depthImage != VK_NULL_HANDLE) {
+		vmaDestroyImage(context.allocator, context.depthImage, context.depthImageAllocation);
+		context.depthImage = VK_NULL_HANDLE;
+		context.depthImageAllocation = VK_NULL_HANDLE;
+	}
+
 	for (VkImageView imageView : context.swapchainImageViews) {
 		vkDestroyImageView(context.device, imageView, nullptr);
 	}
@@ -77,9 +83,9 @@ void VulkanContext_Destroy(VulkanContext& context) {
 		context.surface = VK_NULL_HANDLE;
 	}
 
-	if (context.mAllocator != VK_NULL_HANDLE) {
-		vmaDestroyAllocator(context.mAllocator);
-		context.mAllocator = VK_NULL_HANDLE;
+	if (context.allocator != VK_NULL_HANDLE) {
+		vmaDestroyAllocator(context.allocator);
+		context.allocator = VK_NULL_HANDLE;
 	}
 
 	if (context.device != VK_NULL_HANDLE) {
@@ -238,26 +244,11 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 
 	vkGetDeviceQueue(context.device, context.graphicsQueueFamily, 0, &context.graphicsQueue);
 
-	const VmaVulkanFunctions vmaVulkanFunctions {
-		.vkGetInstanceProcAddr = vkGetInstanceProcAddr,
-		.vkGetDeviceProcAddr = vkGetDeviceProcAddr,
-		.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties,
-		.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties,
-		.vkAllocateMemory = vkAllocateMemory,
-		.vkFreeMemory = vkFreeMemory,
-		.vkMapMemory = vkMapMemory,
-		.vkUnmapMemory = vkUnmapMemory,
-		.vkFlushMappedMemoryRanges = vkFlushMappedMemoryRanges,
-		.vkInvalidateMappedMemoryRanges = vkInvalidateMappedMemoryRanges,
-		.vkBindBufferMemory = vkBindBufferMemory,
-		.vkBindImageMemory = vkBindImageMemory,
-		.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements,
-		.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements,
-		.vkCreateBuffer = vkCreateBuffer,
-		.vkDestroyBuffer = vkDestroyBuffer,
-		.vkCreateImage = vkCreateImage,
-		.vkDestroyImage = vkDestroyImage
-	};
+	volkLoadDevice(context.device);
+
+	VmaVulkanFunctions vmaVulkanFunctions {};
+	vmaVulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+	vmaVulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
 
 	VmaAllocatorCreateInfo allocatorCreateInfo {};
 	allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
@@ -266,7 +257,7 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 	allocatorCreateInfo.instance = context.instance;
 	allocatorCreateInfo.pVulkanFunctions = &vmaVulkanFunctions;
 
-	if (vmaCreateAllocator(&allocatorCreateInfo, &context.mAllocator) != VK_SUCCESS) {
+	if (vmaCreateAllocator(&allocatorCreateInfo, &context.allocator) != VK_SUCCESS) {
 		LOG_ERROR("Failed to create VMA allocator!");
 		return false;
 	}
@@ -318,12 +309,12 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 
 	uint32_t imageCount = 0;
 	if (vkGetSwapchainImagesKHR(context.device, context.swapchain, &imageCount, nullptr) != VK_SUCCESS) {
-		LOG_ERROR("Failed to get swapchain images!");
+		LOG_ERROR("Failed to get swapchain image count!");
 		return false;
 	}
 	context.swapchainImages.resize(imageCount);
 	if (vkGetSwapchainImagesKHR(context.device, context.swapchain, &imageCount, context.swapchainImages.data()) != VK_SUCCESS) {
-		LOG_ERROR("Failed to get swapchain image views!");
+		LOG_ERROR("Failed to get swapchain image!");
 		return false;
 	}
 	context.swapchainImageViews.resize(imageCount);
@@ -353,6 +344,47 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 			LOG_ERROR("Failed to create swapchain image views!");
 			return false;
 		}
+	}
+
+	constexpr std::array<VkFormat, 2> depthFormatList = {
+		VK_FORMAT_D32_SFLOAT_S8_UINT,
+		VK_FORMAT_D24_UNORM_S8_UINT
+	};
+	VkFormat depthFormat = VK_FORMAT_UNDEFINED;
+	for (VkFormat format : depthFormatList) {
+		VkFormatProperties2 props {};
+		props.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
+		vkGetPhysicalDeviceFormatProperties2(context.physicalDevice, format, &props);
+		if (props.formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+			depthFormat = format;
+			break;
+		}
+	}
+
+	if (depthFormat == VK_FORMAT_UNDEFINED) {
+		LOG_ERROR("Failed to find a depth format!");
+		return false;
+	}
+
+	VkImageCreateInfo depthImageCI {};
+	depthImageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	depthImageCI.imageType = VK_IMAGE_TYPE_2D;
+	depthImageCI.format = depthFormat;
+	depthImageCI.extent = VkExtent3D { .width = context.swapchainExtent.width, .height = context.swapchainExtent.height, .depth = 1 };
+	depthImageCI.mipLevels = 1;
+	depthImageCI.arrayLayers = 1;
+	depthImageCI.samples = VK_SAMPLE_COUNT_1_BIT;
+	depthImageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
+	depthImageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	depthImageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	VmaAllocationCreateInfo depthAllocCI {};
+	depthAllocCI.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+	depthAllocCI.usage = VMA_MEMORY_USAGE_AUTO;
+
+	if (vmaCreateImage(context.allocator, &depthImageCI, &depthAllocCI, &context.depthImage, &context.depthImageAllocation, nullptr) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create depth texture!");
+		return false;
 	}
 
 	return true;

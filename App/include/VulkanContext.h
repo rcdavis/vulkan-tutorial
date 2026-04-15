@@ -21,7 +21,7 @@ struct VulkanContext {
 
 	constexpr static uint32_t InvalidQueueFamily = -1;
 
-	VmaAllocator mAllocator = VK_NULL_HANDLE;
+	VmaAllocator allocator = VK_NULL_HANDLE;
 
 	VkInstance instance = VK_NULL_HANDLE;
 
@@ -37,6 +37,9 @@ struct VulkanContext {
 
 	std::vector<VkImage> swapchainImages;
 	std::vector<VkImageView> swapchainImageViews;
+
+	VkImage depthImage = VK_NULL_HANDLE;
+	VmaAllocation depthImageAllocation = VK_NULL_HANDLE;
 
 	VkQueue graphicsQueue = VK_NULL_HANDLE;
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;
