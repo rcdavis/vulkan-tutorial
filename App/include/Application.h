@@ -22,8 +22,8 @@ private:
 	void Render();
 
 private:
-	Platform mPlatform {};
-	VulkanContext mVulkanContext {};
+	Platform mPlatform;
+	VulkanContext mVulkanContext;
 
 	bool mIsRunning = false;
 };

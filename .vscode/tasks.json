@@ -2,32 +2,16 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Build All - Linux Debug (Clang)",
+			"label": "Build All",
 			"type": "shell",
-			"command": "ninja",
-			"args": [],
-			"options": {
-				"cwd": "${workspaceFolder}/build/linux-debug-clang"
-			},
+			"command": "cmake",
+			"args": [
+				"--build",
+				"${command:cmake.buildDirectory}"
+			],
 			"group": {
 				"kind": "build",
 				"isDefault": true
-			},
-			"presentation": {
-				"reveal": "always"
-			}
-		},
-		{
-			"label": "Build All - Linux Debug (GCC)",
-			"type": "shell",
-			"command": "ninja",
-			"args": [],
-			"options": {
-				"cwd": "${workspaceFolder}/build/linux-debug-gcc"
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": false
 			},
 			"presentation": {
 				"reveal": "always"
