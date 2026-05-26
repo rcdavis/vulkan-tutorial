@@ -70,6 +70,21 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 }
 
 void VulkanContext_Destroy(VulkanContext& context) {
+	if (context.device != VK_NULL_HANDLE) {
+		if (vkDeviceWaitIdle(context.device) != VK_SUCCESS) {
+			LOG_ERROR("Failed to wait for device idle during cleanup!");
+		}
+	}
+
+	for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; ++i) {
+		if (context.shaderDataBuffers[i].buffer != VK_NULL_HANDLE) {
+			vmaDestroyBuffer(context.allocator, context.shaderDataBuffers[i].buffer, context.shaderDataBuffers[i].allocation);
+			context.shaderDataBuffers[i].buffer = VK_NULL_HANDLE;
+			context.shaderDataBuffers[i].allocation = VK_NULL_HANDLE;
+			context.shaderDataBuffers[i].bufferDeviceAddress = {};
+		}
+	}
+
 	if (context.vertexBuffer != VK_NULL_HANDLE) {
 		vmaDestroyBuffer(context.allocator, context.vertexBuffer, context.vertexBufferAllocation);
 		context.vertexBuffer = VK_NULL_HANDLE;

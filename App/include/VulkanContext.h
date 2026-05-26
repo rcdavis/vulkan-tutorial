@@ -3,8 +3,11 @@
 #include "volk.h"
 #include "vk_mem_alloc.h"
 
+#include "ShaderData.h"
+
 #include <array>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 struct Platform;
 
@@ -18,6 +21,8 @@ struct VulkanContext {
 	constexpr static std::array ValidationLayers = {
 		"VK_LAYER_KHRONOS_validation"
 	};
+
+	constexpr static uint32_t MaxFramesInFlight = 2;
 
 	constexpr static uint32_t InvalidQueueFamily = -1;
 
@@ -44,6 +49,9 @@ struct VulkanContext {
 
 	VkBuffer vertexBuffer = VK_NULL_HANDLE;
 	VmaAllocation vertexBufferAllocation = VK_NULL_HANDLE;
+
+	std::array<ShaderDataBuffer, MaxFramesInFlight> shaderDataBuffers;
+	std::array<VkCommandBuffer, MaxFramesInFlight> commandBuffers{};
 
 	VkQueue graphicsQueue = VK_NULL_HANDLE;
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;
