@@ -5,7 +5,7 @@
 		"--background-index",
 		"--clang-tidy",
 		"--completion-style=detailed",
-		"--compile-commands-dir=/home/ren/repos/vulkan-tutorial/build/linux-debug-clang",
+		"--compile-commands-dir=${command:cmake.buildDirectory}",
 		"--query-driver=/usr/bin/g++"
 	]
 }

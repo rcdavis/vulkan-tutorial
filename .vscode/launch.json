@@ -2,15 +2,13 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "App - Linux Debug (Clang)",
+			"name": "Launch App",
 			"type": "cppdbg",
 			"request": "launch",
-			"program": "${workspaceFolder}/build/linux-debug-clang/App/App",
-			"args": [
-				"res/games/pong2.c8"
-			],
+			"program": "${command:cmake.launchTargetPath}",
+			"args": [],
 			"stopAtEntry": false,
-			"cwd": "${workspaceFolder}/build/linux-debug-clang/App",
+			"cwd": "${command:cmake.launchTargetDirectory}",
 			"environment": [],
 			"externalConsole": false,
 			"MIMode": "gdb",
@@ -22,30 +20,7 @@
 				}
 			],
 			"miDebuggerPath": "/usr/bin/gdb",
-			"preLaunchTask": "Build All - Linux Debug (Clang)"
-		},
-		{
-			"name": "App - Linux Debug (GCC)",
-			"type": "cppdbg",
-			"request": "launch",
-			"program": "${workspaceFolder}/build/linux-debug-gcc/App/App",
-			"args": [
-				"res/games/pong2.c8"
-			],
-			"stopAtEntry": false,
-			"cwd": "${workspaceFolder}/build/linux-debug-gcc/App",
-			"environment": [],
-			"externalConsole": false,
-			"MIMode": "gdb",
-			"setupCommands": [
-				{
-					"description": "Enable pretty-printing",
-					"text": "-enable-pretty-printing",
-					"ignoreFailures": true
-				}
-			],
-			"miDebuggerPath": "/usr/bin/gdb",
-			"preLaunchTask": "Build All - Linux Debug (GCC)"
+			"preLaunchTask": "Build All"
 		}
 	]
 }
