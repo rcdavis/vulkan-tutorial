@@ -447,7 +447,7 @@ static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& pl
 		VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT |
 		VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-	VmaAllocationCreateInfo vertexBufferAllocCI {
+	constexpr VmaAllocationCreateInfo vertexBufferAllocCI {
 		.flags = vertexBufferAllocFlags,
 		.usage = VMA_MEMORY_USAGE_AUTO,
 	};
@@ -460,8 +460,8 @@ static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& pl
 		return false;
 	}
 
-	memcpy(vertexBufferAllocInfo.pMappedData, vertices.data(), vertexBufferSize);
-	memcpy((uint8_t*)vertexBufferAllocInfo.pMappedData + vertexBufferSize, indices.data(), indexBufferSize);
+	memcpy(vertexBufferAllocInfo.pMappedData, std::data(vertices), vertexBufferSize);
+	memcpy((uint8_t*)vertexBufferAllocInfo.pMappedData + vertexBufferSize, std::data(indices), indexBufferSize);
 
 	return true;
 }
