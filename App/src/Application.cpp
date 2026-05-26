@@ -1,7 +1,6 @@
 #include "Application.h"
 
 #include "Utils/Log.h"
-#include "Utils/VkUtils.h"
 
 Application::~Application() {
 	Shutdown();

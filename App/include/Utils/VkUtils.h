@@ -30,12 +30,9 @@ namespace VkUtils {
 
 		constexpr VkDebugUtilsMessengerCreateInfoEXT createInfo {
 			.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-			.pNext = nullptr,
-			.flags = 0,
 			.messageSeverity = severityFlags,
 			.messageType = messageTypes,
 			.pfnUserCallback = DebugCallback,
-			.pUserData = nullptr
 		};
 
 		return createInfo;

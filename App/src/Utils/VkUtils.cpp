@@ -17,6 +17,9 @@ namespace VkUtils {
 		uint32_t count = 0;
 		vkEnumeratePhysicalDevices(instance, &count, nullptr);
 
+		if (count == 0)
+			return {};
+
 		std::vector<VkPhysicalDevice> devices(count);
 		vkEnumeratePhysicalDevices(instance, &count, std::data(devices));
 

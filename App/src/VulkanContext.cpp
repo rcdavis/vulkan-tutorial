@@ -140,23 +140,18 @@ static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platf
 
 	constexpr VkApplicationInfo appInfo {
 		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-		.pNext = nullptr,
 		.pApplicationName = "Vulkan Tutorial",
 		.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
 		.pEngineName = "No Engine",
 		.engineVersion = VK_MAKE_VERSION(1, 0, 0),
-		.apiVersion = VK_API_VERSION_1_3
+		.apiVersion = VK_API_VERSION_1_3,
 	};
 
 	VkInstanceCreateInfo createInfo {
 		.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-		.pNext = nullptr,
-		.flags = 0,
 		.pApplicationInfo = &appInfo,
-		.enabledLayerCount = 0,
-		.ppEnabledLayerNames = nullptr,
 		.enabledExtensionCount = (uint32_t)std::size(instanceExtensions),
-		.ppEnabledExtensionNames = std::data(instanceExtensions)
+		.ppEnabledExtensionNames = std::data(instanceExtensions),
 	};
 
 	constexpr auto debugCreateInfo = VkUtils::CreateDebugMessengerCreateInfo();
@@ -184,8 +179,9 @@ static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platf
 static bool VulkanContext_CreateDevice(VulkanContext& context) {
 	const auto devices = VkUtils::GetPhysicalDevices(context.instance);
 	for (const auto& device : devices) {
-		VkPhysicalDeviceProperties2 deviceProps {};
-		deviceProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		VkPhysicalDeviceProperties2 deviceProps {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+		};
 
 		vkGetPhysicalDeviceProperties2(device, &deviceProps);
 
@@ -221,41 +217,46 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 	}
 
 	constexpr float queuePriority = 1.0f;
-	VkDeviceQueueCreateInfo queueCreateInfo {};
-	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	queueCreateInfo.queueFamilyIndex = context.graphicsQueueFamily;
-	queueCreateInfo.queueCount = 1;
-	queueCreateInfo.pQueuePriorities = &queuePriority;
+	VkDeviceQueueCreateInfo queueCreateInfo {
+		.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+		.queueFamilyIndex = context.graphicsQueueFamily,
+		.queueCount = 1,
+		.pQueuePriorities = &queuePriority,
+	};
 
-	VkPhysicalDeviceVulkan12Features deviceFeatures12 {};
-	deviceFeatures12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-	deviceFeatures12.descriptorIndexing = VK_TRUE;
-	deviceFeatures12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-	deviceFeatures12.descriptorBindingVariableDescriptorCount = VK_TRUE;
-	deviceFeatures12.runtimeDescriptorArray = VK_TRUE;
-	deviceFeatures12.bufferDeviceAddress = VK_TRUE;
+	VkPhysicalDeviceVulkan12Features deviceFeatures12 {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+		.descriptorIndexing = VK_TRUE,
+		.shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
+		.descriptorBindingVariableDescriptorCount = VK_TRUE,
+		.runtimeDescriptorArray = VK_TRUE,
+		.bufferDeviceAddress = VK_TRUE,
+	};
 
-	VkPhysicalDeviceVulkan13Features deviceFeatures13 {};
-	deviceFeatures13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-	deviceFeatures13.pNext = &deviceFeatures12;
-	deviceFeatures13.synchronization2 = VK_TRUE;
-	deviceFeatures13.dynamicRendering = VK_TRUE;
+	VkPhysicalDeviceVulkan13Features deviceFeatures13 {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+		.pNext = &deviceFeatures12,
+		.synchronization2 = VK_TRUE,
+		.dynamicRendering = VK_TRUE
+	};
 
-	VkPhysicalDeviceFeatures enabledFeatures {};
-	enabledFeatures.samplerAnisotropy = VK_TRUE;
+	VkPhysicalDeviceFeatures enabledFeatures {
+		.samplerAnisotropy = VK_TRUE
+	};
 
 	constexpr std::array deviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
 
-	VkDeviceCreateInfo createInfo {};
-	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-	createInfo.pNext = &deviceFeatures13;
-	createInfo.queueCreateInfoCount = 1;
-	createInfo.pQueueCreateInfos = &queueCreateInfo;
-	createInfo.enabledExtensionCount = (uint32_t)std::size(deviceExtensions);
-	createInfo.ppEnabledExtensionNames = std::data(deviceExtensions);
-	createInfo.pEnabledFeatures = &enabledFeatures;
+	const VkDeviceCreateInfo createInfo {
+		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+		.pNext = &deviceFeatures13,
+		.queueCreateInfoCount = 1,
+		.pQueueCreateInfos = &queueCreateInfo,
+		.enabledExtensionCount = (uint32_t)std::size(deviceExtensions),
+		.ppEnabledExtensionNames = std::data(deviceExtensions),
+		.pEnabledFeatures = &enabledFeatures
+	};
 
 	if (vkCreateDevice(context.physicalDevice, &createInfo, nullptr, &context.device) != VK_SUCCESS) {
 		LOG_ERROR("Failed to create Vulkan device!");
@@ -266,16 +267,18 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 
 	volkLoadDevice(context.device);
 
-	VmaVulkanFunctions vmaVulkanFunctions {};
-	vmaVulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
-	vmaVulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
+	VmaVulkanFunctions vmaVulkanFunctions {
+		.vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+		.vkGetDeviceProcAddr = vkGetDeviceProcAddr,
+	};
 
-	VmaAllocatorCreateInfo allocatorCreateInfo {};
-	allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
-	allocatorCreateInfo.physicalDevice = context.physicalDevice;
-	allocatorCreateInfo.device = context.device;
-	allocatorCreateInfo.instance = context.instance;
-	allocatorCreateInfo.pVulkanFunctions = &vmaVulkanFunctions;
+	const VmaAllocatorCreateInfo allocatorCreateInfo {
+		.physicalDevice = context.physicalDevice,
+		.device = context.device,
+		.pVulkanFunctions = &vmaVulkanFunctions,
+		.instance = context.instance,
+		.vulkanApiVersion = VK_API_VERSION_1_3,
+	};
 
 	if (vmaCreateAllocator(&allocatorCreateInfo, &context.allocator) != VK_SUCCESS) {
 		LOG_ERROR("Failed to create VMA allocator!");
@@ -345,17 +348,9 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 			.image = context.swapchainImages[i],
 			.viewType = VK_IMAGE_VIEW_TYPE_2D,
 			.format = desiredFormat,
-			.components = {
-				.r = VK_COMPONENT_SWIZZLE_IDENTITY,
-				.g = VK_COMPONENT_SWIZZLE_IDENTITY,
-				.b = VK_COMPONENT_SWIZZLE_IDENTITY,
-				.a = VK_COMPONENT_SWIZZLE_IDENTITY
-			},
 			.subresourceRange = {
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel = 0,
 				.levelCount = 1,
-				.baseArrayLayer = 0,
 				.layerCount = 1
 			}
 		};
@@ -372,8 +367,9 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 	};
 	VkFormat depthFormat = VK_FORMAT_UNDEFINED;
 	for (VkFormat format : depthFormatList) {
-		VkFormatProperties2 props {};
-		props.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2;
+		VkFormatProperties2 props {
+			 .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
+		};
 		vkGetPhysicalDeviceFormatProperties2(context.physicalDevice, format, &props);
 		if (props.formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
 			depthFormat = format;
@@ -386,35 +382,40 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 		return false;
 	}
 
-	VkImageCreateInfo depthImageCI {};
-	depthImageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	depthImageCI.imageType = VK_IMAGE_TYPE_2D;
-	depthImageCI.format = depthFormat;
-	depthImageCI.extent = VkExtent3D { .width = context.swapchainExtent.width, .height = context.swapchainExtent.height, .depth = 1 };
-	depthImageCI.mipLevels = 1;
-	depthImageCI.arrayLayers = 1;
-	depthImageCI.samples = VK_SAMPLE_COUNT_1_BIT;
-	depthImageCI.tiling = VK_IMAGE_TILING_OPTIMAL;
-	depthImageCI.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	depthImageCI.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VkImageCreateInfo depthImageCI {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+		.imageType = VK_IMAGE_TYPE_2D,
+		.format = depthFormat,
+		.extent = VkExtent3D { .width = context.swapchainExtent.width, .height = context.swapchainExtent.height, .depth = 1 },
+		.mipLevels = 1,
+		.arrayLayers = 1,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.tiling = VK_IMAGE_TILING_OPTIMAL,
+		.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+	};
 
-	VmaAllocationCreateInfo depthAllocCI {};
-	depthAllocCI.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
-	depthAllocCI.usage = VMA_MEMORY_USAGE_AUTO;
+	VmaAllocationCreateInfo depthAllocCI {
+		.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+		.usage = VMA_MEMORY_USAGE_AUTO,
+	};
 
 	if (vmaCreateImage(context.allocator, &depthImageCI, &depthAllocCI, &context.depthImage, &context.depthImageAllocation, nullptr) != VK_SUCCESS) {
 		LOG_ERROR("Failed to create depth texture!");
 		return false;
 	}
 
-	VkImageViewCreateInfo depthViewCI {};
-	depthViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	depthViewCI.image = context.depthImage;
-	depthViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	depthViewCI.format = depthFormat;
-	depthViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-	depthViewCI.subresourceRange.levelCount = 1;
-	depthViewCI.subresourceRange.layerCount = 1;
+	VkImageViewCreateInfo depthViewCI {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.image = context.depthImage,
+		.viewType = VK_IMAGE_VIEW_TYPE_2D,
+		.format = depthFormat,
+		.subresourceRange = {
+			.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+			.levelCount = 1,
+			.layerCount = 1
+		}
+	};
 
 	if (vkCreateImageView(context.device, &depthViewCI, nullptr, &context.depthImageView) != VK_SUCCESS) {
 		LOG_ERROR("Failed to create depth image view!");
@@ -435,19 +436,21 @@ static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& pl
 	const VkDeviceSize vertexBufferSize = sizeof(Vertex) * vertices.size();
 	const VkDeviceSize indexBufferSize = sizeof(uint16_t) * indices.size();
 
-	VkBufferCreateInfo vertexBufferCI {};
-	vertexBufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	vertexBufferCI.size = vertexBufferSize + indexBufferSize;
-	vertexBufferCI.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+	VkBufferCreateInfo vertexBufferCI {
+		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		.size = vertexBufferSize + indexBufferSize,
+		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+	};
 
 	constexpr VmaAllocationCreateFlags vertexBufferAllocFlags =
 		VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
 		VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT |
 		VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-	VmaAllocationCreateInfo vertexBufferAllocCI {};
-	vertexBufferAllocCI.flags = vertexBufferAllocFlags;
-	vertexBufferAllocCI.usage = VMA_MEMORY_USAGE_AUTO;
+	VmaAllocationCreateInfo vertexBufferAllocCI {
+		.flags = vertexBufferAllocFlags,
+		.usage = VMA_MEMORY_USAGE_AUTO,
+	};
 
 	VmaAllocationInfo vertexBufferAllocInfo {};
 	if (vmaCreateBuffer(context.allocator, &vertexBufferCI, &vertexBufferAllocCI,
