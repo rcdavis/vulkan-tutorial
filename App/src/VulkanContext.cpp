@@ -17,6 +17,8 @@ static bool VulkanContext_CreateShaderDataBuffers(VulkanContext& context);
 
 static bool VulkanContext_CreateSyncObjects(VulkanContext& context);
 
+static bool VulkanContext_CreateCommandBuffers(VulkanContext& context);
+
 static bool CheckValidationLayerSupport() {
 	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
 	for (const char* layerName : VulkanContext::ValidationLayers) {
@@ -79,6 +81,11 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 		return false;
 	}
 
+	if (!VulkanContext_CreateCommandBuffers(context)) {
+		LOG_ERROR("Failed to create command buffers!");
+		return false;
+	}
+
 	return true;
 }
 
@@ -106,6 +113,8 @@ void VulkanContext_Destroy(VulkanContext& context) {
 			vkDestroySemaphore(context.device, context.imageAvailableSemaphores[i], nullptr);
 			context.imageAvailableSemaphores[i] = VK_NULL_HANDLE;
 		}
+
+		context.commandBuffers[i] = VK_NULL_HANDLE;
 	}
 
 	for (VkSemaphore semaphore : context.renderFinishedSemaphores) {
@@ -144,6 +153,11 @@ void VulkanContext_Destroy(VulkanContext& context) {
 	if (context.surface != VK_NULL_HANDLE) {
 		vkDestroySurfaceKHR(context.instance, context.surface, nullptr);
 		context.surface = VK_NULL_HANDLE;
+	}
+
+	if (context.commandPool != VK_NULL_HANDLE) {
+		vkDestroyCommandPool(context.device, context.commandPool, nullptr);
+		context.commandPool = VK_NULL_HANDLE;
 	}
 
 	if (context.allocator != VK_NULL_HANDLE) {
@@ -575,6 +589,32 @@ static bool VulkanContext_CreateSyncObjects(VulkanContext& context) {
 			LOG_ERROR("Failed to create render finished semaphore {}!", i);
 			return false;
 		}
+	}
+
+	return true;
+}
+
+static bool VulkanContext_CreateCommandBuffers(VulkanContext& context) {
+	const VkCommandPoolCreateInfo commandPoolCI {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+		.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+		.queueFamilyIndex = context.graphicsQueueFamily,
+	};
+
+	if (vkCreateCommandPool(context.device, &commandPoolCI, nullptr, &context.commandPool) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create command pool!");
+		return false;
+	}
+
+	const VkCommandBufferAllocateInfo commandBufferAI {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = context.commandPool,
+		.commandBufferCount = VulkanContext::MaxFramesInFlight,
+	};
+
+	if (vkAllocateCommandBuffers(context.device, &commandBufferAI, std::data(context.commandBuffers)) != VK_SUCCESS) {
+		LOG_ERROR("Failed to allocate command buffers!");
+		return false;
 	}
 
 	return true;

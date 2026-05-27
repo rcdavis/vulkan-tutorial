@@ -50,8 +50,10 @@ struct VulkanContext {
 	VkBuffer vertexBuffer = VK_NULL_HANDLE;
 	VmaAllocation vertexBufferAllocation = VK_NULL_HANDLE;
 
-	std::array<ShaderDataBuffer, MaxFramesInFlight> shaderDataBuffers;
+	VkCommandPool commandPool = VK_NULL_HANDLE;
 	std::array<VkCommandBuffer, MaxFramesInFlight> commandBuffers{};
+
+	std::array<ShaderDataBuffer, MaxFramesInFlight> shaderDataBuffers;
 
 	std::vector<VkSemaphore> renderFinishedSemaphores{};
 	std::array<VkSemaphore, MaxFramesInFlight> imageAvailableSemaphores{};
