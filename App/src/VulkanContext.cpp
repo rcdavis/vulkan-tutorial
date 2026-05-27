@@ -13,6 +13,7 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 
 static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& platform);
 
+static bool VulkanContext_CreateShaderDataBuffers(VulkanContext& context);
 
 static bool CheckValidationLayerSupport() {
 	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
@@ -66,10 +67,30 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 		return false;
 	}
 
+	if (!VulkanContext_CreateShaderDataBuffers(context)) {
+		LOG_ERROR("Failed to create shader data buffers!");
+		return false;
+	}
+
 	return true;
 }
 
 void VulkanContext_Destroy(VulkanContext& context) {
+	if (context.device != VK_NULL_HANDLE) {
+		if (vkDeviceWaitIdle(context.device) != VK_SUCCESS) {
+			LOG_ERROR("Failed to wait for device idle during cleanup!");
+		}
+	}
+
+	for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; ++i) {
+		if (context.shaderDataBuffers[i].buffer != VK_NULL_HANDLE) {
+			vmaDestroyBuffer(context.allocator, context.shaderDataBuffers[i].buffer, context.shaderDataBuffers[i].allocation);
+			context.shaderDataBuffers[i].buffer = VK_NULL_HANDLE;
+			context.shaderDataBuffers[i].allocation = VK_NULL_HANDLE;
+			context.shaderDataBuffers[i].bufferDeviceAddress = {};
+		}
+	}
+
 	if (context.vertexBuffer != VK_NULL_HANDLE) {
 		vmaDestroyBuffer(context.allocator, context.vertexBuffer, context.vertexBufferAllocation);
 		context.vertexBuffer = VK_NULL_HANDLE;
@@ -240,7 +261,7 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 		.dynamicRendering = VK_TRUE
 	};
 
-	VkPhysicalDeviceFeatures enabledFeatures {
+	constexpr VkPhysicalDeviceFeatures enabledFeatures {
 		.samplerAnisotropy = VK_TRUE
 	};
 
@@ -267,12 +288,13 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 
 	volkLoadDevice(context.device);
 
-	VmaVulkanFunctions vmaVulkanFunctions {
+	const VmaVulkanFunctions vmaVulkanFunctions {
 		.vkGetInstanceProcAddr = vkGetInstanceProcAddr,
 		.vkGetDeviceProcAddr = vkGetDeviceProcAddr,
 	};
 
 	const VmaAllocatorCreateInfo allocatorCreateInfo {
+		.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
 		.physicalDevice = context.physicalDevice,
 		.device = context.device,
 		.pVulkanFunctions = &vmaVulkanFunctions,
@@ -382,7 +404,7 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 		return false;
 	}
 
-	VkImageCreateInfo depthImageCI {
+	const VkImageCreateInfo depthImageCI {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 		.imageType = VK_IMAGE_TYPE_2D,
 		.format = depthFormat,
@@ -395,7 +417,7 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 	};
 
-	VmaAllocationCreateInfo depthAllocCI {
+	constexpr VmaAllocationCreateInfo depthAllocCI {
 		.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
 		.usage = VMA_MEMORY_USAGE_AUTO,
 	};
@@ -405,7 +427,7 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 		return false;
 	}
 
-	VkImageViewCreateInfo depthViewCI {
+	const VkImageViewCreateInfo depthViewCI {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.image = context.depthImage,
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
@@ -436,7 +458,7 @@ static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& pl
 	const VkDeviceSize vertexBufferSize = sizeof(Vertex) * vertices.size();
 	const VkDeviceSize indexBufferSize = sizeof(uint16_t) * indices.size();
 
-	VkBufferCreateInfo vertexBufferCI {
+	const VkBufferCreateInfo vertexBufferCI {
 		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 		.size = vertexBufferSize + indexBufferSize,
 		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
@@ -462,6 +484,43 @@ static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& pl
 
 	memcpy(vertexBufferAllocInfo.pMappedData, std::data(vertices), vertexBufferSize);
 	memcpy((uint8_t*)vertexBufferAllocInfo.pMappedData + vertexBufferSize, std::data(indices), indexBufferSize);
+
+	return true;
+}
+
+static bool VulkanContext_CreateShaderDataBuffers(VulkanContext& context) {
+	for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; ++i) {
+		constexpr VkBufferCreateInfo bufferCI {
+			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			.size = sizeof(ShaderData),
+			.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		};
+
+		constexpr VmaAllocationCreateFlags bufferAllocFlags =
+			VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+			VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT |
+			VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+		constexpr VmaAllocationCreateInfo bufferAllocCI {
+			.flags = bufferAllocFlags,
+			.usage = VMA_MEMORY_USAGE_AUTO,
+		};
+
+		VmaAllocationInfo bufferAllocInfo {};
+		if (vmaCreateBuffer(context.allocator, &bufferCI, &bufferAllocCI,
+			&context.shaderDataBuffers[i].buffer, &context.shaderDataBuffers[i].allocation, &bufferAllocInfo) != VK_SUCCESS
+		) {
+			LOG_ERROR("Failed to create shader data buffer {}!", i);
+			return false;
+		}
+
+		const VkBufferDeviceAddressInfo bufferAddressInfo {
+			.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+			.buffer = context.shaderDataBuffers[i].buffer
+		};
+
+		context.shaderDataBuffers[i].bufferDeviceAddress = vkGetBufferDeviceAddress(context.device, &bufferAddressInfo);
+	}
 
 	return true;
 }
