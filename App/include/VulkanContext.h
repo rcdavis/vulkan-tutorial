@@ -53,6 +53,10 @@ struct VulkanContext {
 	std::array<ShaderDataBuffer, MaxFramesInFlight> shaderDataBuffers;
 	std::array<VkCommandBuffer, MaxFramesInFlight> commandBuffers{};
 
+	std::vector<VkSemaphore> renderFinishedSemaphores{};
+	std::array<VkSemaphore, MaxFramesInFlight> imageAvailableSemaphores{};
+	std::array<VkFence, MaxFramesInFlight> inFlightFences{};
+
 	VkQueue graphicsQueue = VK_NULL_HANDLE;
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;
 };
