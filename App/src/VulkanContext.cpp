@@ -15,6 +15,8 @@ static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& pl
 
 static bool VulkanContext_CreateShaderDataBuffers(VulkanContext& context);
 
+static bool VulkanContext_CreateSyncObjects(VulkanContext& context);
+
 static bool CheckValidationLayerSupport() {
 	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
 	for (const char* layerName : VulkanContext::ValidationLayers) {
@@ -72,6 +74,11 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 		return false;
 	}
 
+	if (!VulkanContext_CreateSyncObjects(context)) {
+		LOG_ERROR("Failed to create synchronization objects!");
+		return false;
+	}
+
 	return true;
 }
 
@@ -89,7 +96,24 @@ void VulkanContext_Destroy(VulkanContext& context) {
 			context.shaderDataBuffers[i].allocation = VK_NULL_HANDLE;
 			context.shaderDataBuffers[i].bufferDeviceAddress = {};
 		}
+
+		if (context.inFlightFences[i] != VK_NULL_HANDLE) {
+			vkDestroyFence(context.device, context.inFlightFences[i], nullptr);
+			context.inFlightFences[i] = VK_NULL_HANDLE;
+		}
+
+		if (context.imageAvailableSemaphores[i] != VK_NULL_HANDLE) {
+			vkDestroySemaphore(context.device, context.imageAvailableSemaphores[i], nullptr);
+			context.imageAvailableSemaphores[i] = VK_NULL_HANDLE;
+		}
 	}
+
+	for (uint32_t i = 0; i < context.renderFinishedSemaphores.size(); ++i) {
+		if (context.renderFinishedSemaphores[i] != VK_NULL_HANDLE) {
+			vkDestroySemaphore(context.device, context.renderFinishedSemaphores[i], nullptr);
+		}
+	}
+	context.renderFinishedSemaphores.clear();
 
 	if (context.vertexBuffer != VK_NULL_HANDLE) {
 		vmaDestroyBuffer(context.allocator, context.vertexBuffer, context.vertexBufferAllocation);
@@ -520,6 +544,39 @@ static bool VulkanContext_CreateShaderDataBuffers(VulkanContext& context) {
 		};
 
 		context.shaderDataBuffers[i].bufferDeviceAddress = vkGetBufferDeviceAddress(context.device, &bufferAddressInfo);
+	}
+
+	return true;
+}
+
+static bool VulkanContext_CreateSyncObjects(VulkanContext& context) {
+	constexpr VkSemaphoreCreateInfo semaphoreCI {
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+	};
+
+	constexpr VkFenceCreateInfo fenceCI {
+		.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+		.flags = VK_FENCE_CREATE_SIGNALED_BIT,
+	};
+
+	for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; ++i) {
+		if (vkCreateFence(context.device, &fenceCI, nullptr, &context.inFlightFences[i]) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create in-flight fence {}!", i);
+			return false;
+		}
+
+		if (vkCreateSemaphore(context.device, &semaphoreCI, nullptr, &context.imageAvailableSemaphores[i]) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create image available semaphore {}!", i);
+			return false;
+		}
+	}
+
+	context.renderFinishedSemaphores.resize(context.swapchainImages.size());
+	for (uint32_t i = 0; i < context.renderFinishedSemaphores.size(); ++i) {
+		if (vkCreateSemaphore(context.device, &semaphoreCI, nullptr, &context.renderFinishedSemaphores[i]) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create render finished semaphore {}!", i);
+			return false;
+		}
 	}
 
 	return true;
