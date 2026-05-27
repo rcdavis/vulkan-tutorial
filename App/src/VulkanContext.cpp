@@ -108,10 +108,8 @@ void VulkanContext_Destroy(VulkanContext& context) {
 		}
 	}
 
-	for (uint32_t i = 0; i < context.renderFinishedSemaphores.size(); ++i) {
-		if (context.renderFinishedSemaphores[i] != VK_NULL_HANDLE) {
-			vkDestroySemaphore(context.device, context.renderFinishedSemaphores[i], nullptr);
-		}
+	for (VkSemaphore semaphore : context.renderFinishedSemaphores) {
+		vkDestroySemaphore(context.device, semaphore, nullptr);
 	}
 	context.renderFinishedSemaphores.clear();
 
@@ -249,9 +247,9 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 	}
 
 	const auto queueFamilies = VkUtils::GetQueueFamilyProperties(context.physicalDevice);
-	for (uint32_t i = 0; i < std::size(queueFamilies); i++) {
+	for (size_t i = 0; i < std::size(queueFamilies); i++) {
 		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-			context.graphicsQueueFamily = i;
+			context.graphicsQueueFamily = (uint32_t)i;
 			break;
 		}
 	}
@@ -388,7 +386,7 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 	}
 	context.swapchainImageViews.resize(imageCount);
 
-	for (int i = 0; i < imageCount; i++) {
+	for (uint32_t i = 0; i < imageCount; i++) {
 		const VkImageViewCreateInfo viewCreateInfo {
 			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 			.image = context.swapchainImages[i],
@@ -572,7 +570,7 @@ static bool VulkanContext_CreateSyncObjects(VulkanContext& context) {
 	}
 
 	context.renderFinishedSemaphores.resize(context.swapchainImages.size());
-	for (uint32_t i = 0; i < context.renderFinishedSemaphores.size(); ++i) {
+	for (size_t i = 0; i < context.renderFinishedSemaphores.size(); ++i) {
 		if (vkCreateSemaphore(context.device, &semaphoreCI, nullptr, &context.renderFinishedSemaphores[i]) != VK_SUCCESS) {
 			LOG_ERROR("Failed to create render finished semaphore {}!", i);
 			return false;
