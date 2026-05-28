@@ -49,4 +49,5 @@ target_link_libraries(App PRIVATE
     glm::glm
     spdlog::spdlog_header_only
     tinyobjloader
+    ktx
 )
