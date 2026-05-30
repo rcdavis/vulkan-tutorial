@@ -4,6 +4,7 @@
 #include "Utils/Log.h"
 #include "Platform.h"
 #include "Mesh.h"
+#include "ktx.h"
 
 static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
 
@@ -18,6 +19,8 @@ static bool VulkanContext_CreateShaderDataBuffers(VulkanContext& context);
 static bool VulkanContext_CreateSyncObjects(VulkanContext& context);
 
 static bool VulkanContext_CreateCommandBuffers(VulkanContext& context);
+
+static bool VulkanContext_CreateTextures(VulkanContext& context);
 
 static bool CheckValidationLayerSupport() {
 	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
@@ -83,6 +86,11 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 
 	if (!VulkanContext_CreateCommandBuffers(context)) {
 		LOG_ERROR("Failed to create command buffers!");
+		return false;
+	}
+
+	if (!VulkanContext_CreateTextures(context)) {
+		LOG_ERROR("Failed to create textures!");
 		return false;
 	}
 
@@ -615,6 +623,27 @@ static bool VulkanContext_CreateCommandBuffers(VulkanContext& context) {
 	if (vkAllocateCommandBuffers(context.device, &commandBufferAI, std::data(context.commandBuffers)) != VK_SUCCESS) {
 		LOG_ERROR("Failed to allocate command buffers!");
 		return false;
+	}
+
+	return true;
+}
+
+static bool VulkanContext_CreateTextures(VulkanContext& context) {
+	constexpr std::array texturePaths = {
+		"res/textures/suzanne0.ktx",
+		"res/textures/suzanne1.ktx",
+		"res/textures/suzanne2.ktx",
+	};
+
+	for (const char* path : texturePaths) {
+		ktxTexture* ktxTexture = nullptr;
+		auto loadError = ktxTexture_CreateFromNamedFile(path, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
+		if (loadError != KTX_SUCCESS) {
+			LOG_ERROR("Failed to load texture {}: {}", path, ktxErrorString(loadError));
+			return false;
+		}
+
+		ktxTexture_Destroy(ktxTexture);
 	}
 
 	return true;
