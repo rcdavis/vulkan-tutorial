@@ -104,6 +104,10 @@ void VulkanContext_Destroy(VulkanContext& context) {
 		}
 	}
 
+	for (TextureData& texture : context.textures) {
+		TextureData_Destroy(texture, context.device, context.allocator);
+	}
+
 	for (uint32_t i = 0; i < VulkanContext::MaxFramesInFlight; ++i) {
 		if (context.shaderDataBuffers[i].buffer != VK_NULL_HANDLE) {
 			vmaDestroyBuffer(context.allocator, context.shaderDataBuffers[i].buffer, context.shaderDataBuffers[i].allocation);

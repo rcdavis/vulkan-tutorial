@@ -8,6 +8,7 @@ add_executable(App
     src/Mesh.cpp
     src/Platform.cpp
     src/ShaderData.cpp
+    src/TextureData.cpp
     src/TinyObjImpl.cpp
     src/VmaImpl.cpp
     src/VulkanContext.cpp

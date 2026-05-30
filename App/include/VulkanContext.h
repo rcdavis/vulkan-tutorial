@@ -4,6 +4,7 @@
 #include "vk_mem_alloc.h"
 
 #include "ShaderData.h"
+#include "TextureData.h"
 
 #include <array>
 #include <vector>
@@ -52,6 +53,8 @@ struct VulkanContext {
 
 	VkCommandPool commandPool = VK_NULL_HANDLE;
 	std::array<VkCommandBuffer, MaxFramesInFlight> commandBuffers{};
+
+	std::array<TextureData, 3> textures{};
 
 	std::array<ShaderDataBuffer, MaxFramesInFlight> shaderDataBuffers;
 
