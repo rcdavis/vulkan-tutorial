@@ -4,7 +4,9 @@
 #include "Utils/Log.h"
 #include "Platform.h"
 #include "Mesh.h"
+
 #include "ktx.h"
+#include "ktxvulkan.h"
 
 static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
 
@@ -639,15 +641,58 @@ static bool VulkanContext_CreateTextures(VulkanContext& context) {
 		"res/textures/suzanne2.ktx",
 	};
 
-	for (const char* path : texturePaths) {
-		ktxTexture* ktxTexture = nullptr;
-		auto loadError = ktxTexture_CreateFromNamedFile(path, KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture);
+	for (size_t i = 0; i < std::size(texturePaths); ++i) {
+		ktxTexture* texture = nullptr;
+		auto loadError = ktxTexture_CreateFromNamedFile(texturePaths[i], KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture);
 		if (loadError != KTX_SUCCESS) {
-			LOG_ERROR("Failed to load texture {}: {}", path, ktxErrorString(loadError));
+			LOG_ERROR("Failed to load texture {}: {}", texturePaths[i], ktxErrorString(loadError));
 			return false;
 		}
 
-		ktxTexture_Destroy(ktxTexture);
+		const VkFormat imageFormat = ktxTexture_GetVkFormat(texture);
+
+		const VkImageCreateInfo imageCI {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+			.imageType = VK_IMAGE_TYPE_2D,
+			.format = imageFormat,
+			.extent = VkExtent3D { .width = texture->baseWidth, .height = texture->baseHeight, .depth = 1 },
+			.mipLevels = texture->numLevels,
+			.arrayLayers = 1,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.tiling = VK_IMAGE_TILING_OPTIMAL,
+			.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		};
+
+		constexpr VmaAllocationCreateInfo imageAllocCI {
+			.usage = VMA_MEMORY_USAGE_AUTO,
+		};
+
+		if (vmaCreateImage(context.allocator, &imageCI, &imageAllocCI, &context.textures[i].image, &context.textures[i].allocation, nullptr) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create texture image {}!", texturePaths[i]);
+			ktxTexture_Destroy(texture);
+			return false;
+		}
+
+		const VkImageViewCreateInfo imageViewCI {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.image = context.textures[i].image,
+			.viewType = VK_IMAGE_VIEW_TYPE_2D,
+			.format = imageFormat,
+			.subresourceRange = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.levelCount = texture->numLevels,
+				.layerCount = 1
+			}
+		};
+
+		if (vkCreateImageView(context.device, &imageViewCI, nullptr, &context.textures[i].imageView) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create texture image view {}!", texturePaths[i]);
+			ktxTexture_Destroy(texture);
+			return false;
+		}
+
+		ktxTexture_Destroy(texture);
 	}
 
 	return true;
