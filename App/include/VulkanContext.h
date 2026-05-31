@@ -24,6 +24,7 @@ struct VulkanContext {
 	};
 
 	constexpr static uint32_t MaxFramesInFlight = 2;
+	constexpr static uint32_t MaxTextures = 3;
 
 	constexpr static uint32_t InvalidQueueFamily = -1;
 
@@ -54,7 +55,8 @@ struct VulkanContext {
 	VkCommandPool commandPool = VK_NULL_HANDLE;
 	std::array<VkCommandBuffer, MaxFramesInFlight> commandBuffers{};
 
-	std::array<TextureData, 3> textures{};
+	std::array<TextureData, MaxTextures> textures{};
+	std::array<VkDescriptorImageInfo, MaxTextures> textureDescriptors{};
 
 	std::array<ShaderDataBuffer, MaxFramesInFlight> shaderDataBuffers;
 

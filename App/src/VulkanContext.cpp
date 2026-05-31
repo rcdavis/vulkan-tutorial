@@ -108,6 +108,8 @@ void VulkanContext_Destroy(VulkanContext& context) {
 		}
 	}
 
+	context.textureDescriptors.fill({});
+
 	for (TextureData& texture : context.textures) {
 		TextureData_Destroy(texture, context.device, context.allocator);
 	}
@@ -643,6 +645,9 @@ static bool VulkanContext_CreateTextures(VulkanContext& context) {
 		"res/textures/suzanne2.ktx",
 	};
 
+	static_assert(std::size(texturePaths) <= VulkanContext::MaxTextures,
+		"Number of textures exceeds maximum supported by context!");
+
 	for (size_t i = 0; i < std::size(texturePaths); ++i) {
 		ktxTexture* texture = nullptr;
 		auto loadError = ktxTexture_CreateFromNamedFile(texturePaths[i], KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &texture);
@@ -875,7 +880,29 @@ static bool VulkanContext_CreateTextures(VulkanContext& context) {
 		vkDestroyFence(context.device, uploadFence, nullptr);
 		vmaDestroyBuffer(context.allocator, imageSrcBuffer, imageSrcBufferAllocation);
 
+		const VkSamplerCreateInfo samplerCI {
+			.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+			.magFilter = VK_FILTER_LINEAR,
+			.minFilter = VK_FILTER_LINEAR,
+			.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+			.maxLod = (float)texture->numLevels,
+			.anisotropyEnable = VK_TRUE,
+			.maxAnisotropy = 8.0f
+		};
+
+		if (vkCreateSampler(context.device, &samplerCI, nullptr, &context.textures[i].sampler) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create sampler for texture {}!", texturePaths[i]);
+			ktxTexture_Destroy(texture);
+			return false;
+		}
+
 		ktxTexture_Destroy(texture);
+
+		context.textureDescriptors[i] = {
+			.sampler = context.textures[i].sampler,
+			.imageView = context.textures[i].imageView,
+			.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
+		};
 	}
 
 	return true;
