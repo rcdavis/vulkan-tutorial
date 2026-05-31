@@ -7,6 +7,8 @@
 
 #include "ktx.h"
 #include "ktxvulkan.h"
+#include <vector>
+#include <vulkan/vulkan_core.h>
 
 static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
 
@@ -691,6 +693,187 @@ static bool VulkanContext_CreateTextures(VulkanContext& context) {
 			ktxTexture_Destroy(texture);
 			return false;
 		}
+
+		const VkBufferCreateInfo imageSrcBufferCI {
+			.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			.size = texture->dataSize,
+			.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		};
+
+		constexpr VmaAllocationCreateFlags imageSrcBufferAllocFlags =
+			VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+			VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+		constexpr VmaAllocationCreateInfo imageSrcBufferAllocCI {
+			.flags = imageSrcBufferAllocFlags,
+			.usage = VMA_MEMORY_USAGE_AUTO,
+		};
+
+		VkBuffer imageSrcBuffer {};
+		VmaAllocation imageSrcBufferAllocation {};
+		VmaAllocationInfo imageSrcBufferAllocInfo {};
+		if (vmaCreateBuffer(context.allocator, &imageSrcBufferCI, &imageSrcBufferAllocCI, &imageSrcBuffer, &imageSrcBufferAllocation, &imageSrcBufferAllocInfo) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create staging buffer for texture {}!", texturePaths[i]);
+			ktxTexture_Destroy(texture);
+			return false;
+		}
+
+		memcpy(imageSrcBufferAllocInfo.pMappedData, texture->pData, texture->dataSize);
+
+		constexpr VkFenceCreateInfo fenceCI {
+			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+		};
+
+		VkFence uploadFence {};
+		if (vkCreateFence(context.device, &fenceCI, nullptr, &uploadFence) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create upload fence for texture {}!", texturePaths[i]);
+			vmaDestroyBuffer(context.allocator, imageSrcBuffer, imageSrcBufferAllocation);
+			ktxTexture_Destroy(texture);
+			return false;
+		}
+
+		const VkCommandBufferAllocateInfo commandBufferAI {
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool = context.commandPool,
+			.commandBufferCount = 1,
+		};
+
+		VkCommandBuffer commandBuffer {};
+		if (vkAllocateCommandBuffers(context.device, &commandBufferAI, &commandBuffer) != VK_SUCCESS) {
+			LOG_ERROR("Failed to allocate command buffer for texture {}!", texturePaths[i]);
+			vkDestroyFence(context.device, uploadFence, nullptr);
+			vmaDestroyBuffer(context.allocator, imageSrcBuffer, imageSrcBufferAllocation);
+			ktxTexture_Destroy(texture);
+			return false;
+		}
+
+		constexpr VkCommandBufferBeginInfo commandBufferBI {
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+		};
+
+		if (vkBeginCommandBuffer(commandBuffer, &commandBufferBI) != VK_SUCCESS) {
+			LOG_ERROR("Failed to begin command buffer for texture {}!", texturePaths[i]);
+			vkFreeCommandBuffers(context.device, context.commandPool, 1, &commandBuffer);
+			vkDestroyFence(context.device, uploadFence, nullptr);
+			vmaDestroyBuffer(context.allocator, imageSrcBuffer, imageSrcBufferAllocation);
+			ktxTexture_Destroy(texture);
+			return false;
+		}
+
+		const VkImageMemoryBarrier2 barrierTexImage {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+			.srcStageMask = VK_PIPELINE_STAGE_2_NONE,
+			.srcAccessMask = VK_ACCESS_2_NONE,
+			.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+			.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			.image = context.textures[i].image,
+			.subresourceRange = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.levelCount = texture->numLevels,
+				.layerCount = 1
+			}
+		};
+
+		VkDependencyInfo barrierTexInfo {
+			.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+			.imageMemoryBarrierCount = 1,
+			.pImageMemoryBarriers = &barrierTexImage,
+		};
+
+		vkCmdPipelineBarrier2(commandBuffer, &barrierTexInfo);
+
+		std::vector<VkBufferImageCopy> bufferCopyRegions(texture->numLevels);
+		for (uint32_t level = 0; level < texture->numLevels; ++level) {
+			ktx_size_t mipOffset = 0;
+			ktx_error_code_e ret = ktxTexture_GetImageOffset(texture, level, 0, 0, &mipOffset);
+			if (ret != KTX_SUCCESS) {
+				LOG_ERROR("Failed to get image offset for texture {} mip level {}: {}", texturePaths[i], level, ktxErrorString(ret));
+				vkEndCommandBuffer(commandBuffer);
+				vkFreeCommandBuffers(context.device, context.commandPool, 1, &commandBuffer);
+				vkDestroyFence(context.device, uploadFence, nullptr);
+				vmaDestroyBuffer(context.allocator, imageSrcBuffer, imageSrcBufferAllocation);
+				ktxTexture_Destroy(texture);
+				return false;
+			}
+
+			bufferCopyRegions[level] = {
+				.bufferOffset = mipOffset,
+				.imageSubresource = {
+					.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+					.mipLevel = level,
+					.layerCount = 1
+				},
+				.imageExtent = {
+					.width = std::max(1u, texture->baseWidth >> level),
+					.height = std::max(1u, texture->baseHeight >> level),
+					.depth = 1
+				}
+			};
+		}
+
+		vkCmdCopyBufferToImage(commandBuffer, imageSrcBuffer, context.textures[i].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, (uint32_t)std::size(bufferCopyRegions), std::data(bufferCopyRegions));
+
+		const VkImageMemoryBarrier2 barrierTexImageReadable {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+			.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT,
+			.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT,
+			.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			.newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
+			.image = context.textures[i].image,
+			.subresourceRange = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.levelCount = texture->numLevels,
+				.layerCount = 1
+			}
+		};
+		barrierTexInfo.pImageMemoryBarriers = &barrierTexImageReadable;
+		vkCmdPipelineBarrier2(commandBuffer, &barrierTexInfo);
+
+		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+			LOG_ERROR("Failed to end command buffer for texture {}!", texturePaths[i]);
+			vkFreeCommandBuffers(context.device, context.commandPool, 1, &commandBuffer);
+			vkDestroyFence(context.device, uploadFence, nullptr);
+			vmaDestroyBuffer(context.allocator, imageSrcBuffer, imageSrcBufferAllocation);
+			ktxTexture_Destroy(texture);
+			return false;
+		}
+
+		const VkCommandBufferSubmitInfo commandSubmitInfo {
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+			.commandBuffer = commandBuffer
+		};
+
+		const VkSubmitInfo2 submitInfo {
+			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+			.commandBufferInfoCount = 1,
+			.pCommandBufferInfos = &commandSubmitInfo,
+		};
+
+		if (vkQueueSubmit2(context.graphicsQueue, 1, &submitInfo, uploadFence) != VK_SUCCESS) {
+			LOG_ERROR("Failed to submit command buffer for texture {}!", texturePaths[i]);
+			vkFreeCommandBuffers(context.device, context.commandPool, 1, &commandBuffer);
+			vkDestroyFence(context.device, uploadFence, nullptr);
+			vmaDestroyBuffer(context.allocator, imageSrcBuffer, imageSrcBufferAllocation);
+			ktxTexture_Destroy(texture);
+			return false;
+		}
+
+		if (vkWaitForFences(context.device, 1, &uploadFence, VK_TRUE, UINT64_MAX) != VK_SUCCESS) {
+			LOG_ERROR("Failed to wait for upload fence for texture {}!", texturePaths[i]);
+			vkFreeCommandBuffers(context.device, context.commandPool, 1, &commandBuffer);
+			vkDestroyFence(context.device, uploadFence, nullptr);
+			vmaDestroyBuffer(context.allocator, imageSrcBuffer, imageSrcBufferAllocation);
+			ktxTexture_Destroy(texture);
+			return false;
+		}
+
+		vkDestroyFence(context.device, uploadFence, nullptr);
+		vmaDestroyBuffer(context.allocator, imageSrcBuffer, imageSrcBufferAllocation);
 
 		ktxTexture_Destroy(texture);
 	}
