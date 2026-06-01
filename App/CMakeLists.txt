@@ -42,9 +42,17 @@ endif()
 
 target_include_directories(App PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    "$ENV{VULKAN_SDK}/include"
 )
 
 target_compile_features(App PRIVATE cxx_std_20)
+
+find_library(SLANG_LIBRARY
+    NAMES slang
+    HINTS
+        "$ENV{VULKAN_SDK}/lib"
+        "$ENV{VULKAN_SDK}/lib64"
+)
 
 find_package(Vulkan REQUIRED)
 
@@ -57,4 +65,5 @@ target_link_libraries(App PRIVATE
     spdlog::spdlog_header_only
     tinyobjloader
     ktx
+    ${SLANG_LIBRARY}
 )

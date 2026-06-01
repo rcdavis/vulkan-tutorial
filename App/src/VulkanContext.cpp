@@ -7,8 +7,12 @@
 
 #include "ktx.h"
 #include "ktxvulkan.h"
+#include <array>
 #include <vector>
+#include <string>
 #include <vulkan/vulkan_core.h>
+#include <slang/slang.h>
+#include <slang/slang-com-ptr.h>
 
 static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
 
@@ -25,6 +29,8 @@ static bool VulkanContext_CreateSyncObjects(VulkanContext& context);
 static bool VulkanContext_CreateCommandBuffers(VulkanContext& context);
 
 static bool VulkanContext_CreateTextures(VulkanContext& context);
+
+static bool VulkanContext_CreateShaders(VulkanContext& context);
 
 static bool CheckValidationLayerSupport() {
 	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
@@ -95,6 +101,11 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 
 	if (!VulkanContext_CreateTextures(context)) {
 		LOG_ERROR("Failed to create textures!");
+		return false;
+	}
+
+	if (!VulkanContext_CreateShaders(context)) {
+		LOG_ERROR("Failed to create shaders");
 		return false;
 	}
 
@@ -895,9 +906,9 @@ static bool VulkanContext_CreateTextures(VulkanContext& context) {
 			.magFilter = VK_FILTER_LINEAR,
 			.minFilter = VK_FILTER_LINEAR,
 			.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-			.maxLod = (float)texture->numLevels,
 			.anisotropyEnable = VK_TRUE,
 			.maxAnisotropy = 8.0f,
+			.maxLod = (float)texture->numLevels,
 		};
 
 		if (vkCreateSampler(context.device, &samplerCI, nullptr, &context.textures[i].sampler) != VK_SUCCESS) {
@@ -989,6 +1000,79 @@ static bool VulkanContext_CreateTextures(VulkanContext& context) {
 	};
 
 	vkUpdateDescriptorSets(context.device, 1, &writeDescriptorSet, 0, nullptr);
+
+	return true;
+}
+
+static bool VulkanContext_CreateShaders(VulkanContext& context) {
+	Slang::ComPtr<slang::IGlobalSession> slangGlobalSession;
+	slang::createGlobalSession(slangGlobalSession.writeRef());
+
+	const std::array<slang::TargetDesc, 1> slangTargets = {
+		slang::TargetDesc {
+			.format = SLANG_SPIRV,
+			.profile = slangGlobalSession->findProfile("spirv_1_4_vk")
+		}
+	};
+
+	constexpr std::array<slang::CompilerOptionEntry, 1> slangOptions = {
+		slang::CompilerOptionEntry {
+			slang::CompilerOptionName::EmitSpirvDirectly,
+			{slang::CompilerOptionValueKind::Int, 1}
+		}
+	};
+
+	const slang::SessionDesc slangSessionDesc {
+		.targets = std::data(slangTargets),
+		.targetCount = (uint32_t)std::size(slangTargets),
+		.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR,
+		.compilerOptionEntries = std::data(slangOptions),
+		.compilerOptionEntryCount = (uint32_t)std::size(slangOptions),
+	};
+
+	Slang::ComPtr<slang::ISession> slangSession;
+	SlangResult res = slangGlobalSession->createSession(slangSessionDesc, slangSession.writeRef());
+	if (SLANG_FAILED(res) || !slangSession) {
+		LOG_ERROR("Failed to create Slang session (result={})", (int)res);
+		return false;
+	}
+
+	Slang::ComPtr<ISlangBlob> diagnostics;
+	Slang::ComPtr<slang::IModule> slangModule {
+		slangSession->loadModuleFromSource("triangle", "res/shaders/shader.slang", nullptr, diagnostics.writeRef())
+	};
+
+	if (diagnostics) {
+		std::string text((const char*)diagnostics->getBufferPointer(), diagnostics->getBufferSize());
+		LOG_ERROR("Slang loadModuleFromSource failed: {}", text.c_str());
+		return false;
+	}
+
+	Slang::ComPtr<ISlangBlob> spirv;
+	res = slangModule->getTargetCode(0, spirv.writeRef());
+	if (SLANG_FAILED(res) || !spirv) {
+		if (diagnostics) {
+			std::string text((const char*)diagnostics->getBufferPointer(), diagnostics->getBufferSize());
+			LOG_ERROR("Slang getTargetCode failed: {}", text.c_str());
+		} else {
+			LOG_ERROR("Slang getTargetCode failed (result={})", (int)res);
+		}
+		return false;
+	}
+
+	const VkShaderModuleCreateInfo shaderModuleCI {
+		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		.codeSize = spirv->getBufferSize(),
+		.pCode = (const uint32_t*)spirv->getBufferPointer(),
+	};
+
+	VkShaderModule shaderModule {};
+	if (vkCreateShaderModule(context.device, &shaderModuleCI, nullptr, &shaderModule) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create shader module!");
+		return false;
+	}
+
+	vkDestroyShaderModule(context.device, shaderModule, nullptr);
 
 	return true;
 }
