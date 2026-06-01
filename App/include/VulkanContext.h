@@ -52,6 +52,10 @@ struct VulkanContext {
 	VkBuffer vertexBuffer = VK_NULL_HANDLE;
 	VmaAllocation vertexBufferAllocation = VK_NULL_HANDLE;
 
+	VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+	VkDescriptorSetLayout textureDescriptorSetLayout = VK_NULL_HANDLE;
+	VkDescriptorSet textureDescriptorSet = VK_NULL_HANDLE;
+
 	VkCommandPool commandPool = VK_NULL_HANDLE;
 	std::array<VkCommandBuffer, MaxFramesInFlight> commandBuffers{};
 

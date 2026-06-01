@@ -163,6 +163,16 @@ void VulkanContext_Destroy(VulkanContext& context) {
 	context.swapchainImageViews.clear();
 	context.swapchainImages.clear();
 
+	if (context.textureDescriptorSetLayout != VK_NULL_HANDLE) {
+		vkDestroyDescriptorSetLayout(context.device, context.textureDescriptorSetLayout, nullptr);
+		context.textureDescriptorSetLayout = VK_NULL_HANDLE;
+	}
+
+	if (context.descriptorPool != VK_NULL_HANDLE) {
+		vkDestroyDescriptorPool(context.device, context.descriptorPool, nullptr);
+		context.descriptorPool = VK_NULL_HANDLE;
+	}
+
 	if (context.swapchain != VK_NULL_HANDLE) {
 		vkDestroySwapchainKHR(context.device, context.swapchain, nullptr);
 		context.swapchain = VK_NULL_HANDLE;
@@ -887,7 +897,7 @@ static bool VulkanContext_CreateTextures(VulkanContext& context) {
 			.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
 			.maxLod = (float)texture->numLevels,
 			.anisotropyEnable = VK_TRUE,
-			.maxAnisotropy = 8.0f
+			.maxAnisotropy = 8.0f,
 		};
 
 		if (vkCreateSampler(context.device, &samplerCI, nullptr, &context.textures[i].sampler) != VK_SUCCESS) {
@@ -904,6 +914,81 @@ static bool VulkanContext_CreateTextures(VulkanContext& context) {
 			.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
 		};
 	}
+
+	constexpr VkDescriptorBindingFlags descriptorBindingFlags = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+
+	const VkDescriptorSetLayoutBindingFlagsCreateInfo descriptorSetLayoutBindingFlagsCI {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+		.bindingCount = 1,
+		.pBindingFlags = &descriptorBindingFlags,
+	};
+
+	constexpr VkDescriptorSetLayoutBinding samplerArrayBinding {
+		.binding = 0,
+		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.descriptorCount = VulkanContext::MaxTextures,
+		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+	};
+
+	const VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCI {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.pNext = &descriptorSetLayoutBindingFlagsCI,
+		.bindingCount = 1,
+		.pBindings = &samplerArrayBinding,
+	};
+
+	if (vkCreateDescriptorSetLayout(context.device, &descriptorSetLayoutCI, nullptr, &context.textureDescriptorSetLayout) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create texture descriptor set layout!");
+		return false;
+	}
+
+	constexpr VkDescriptorPoolSize descriptorPoolSize {
+		.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.descriptorCount = VulkanContext::MaxTextures,
+	};
+
+	const VkDescriptorPoolCreateInfo descriptorPoolCI {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		.maxSets = 1,
+		.poolSizeCount = 1,
+		.pPoolSizes = &descriptorPoolSize,
+	};
+
+	if (vkCreateDescriptorPool(context.device, &descriptorPoolCI, nullptr, &context.descriptorPool) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create texture descriptor pool!");
+		return false;
+	}
+
+	constexpr uint32_t varDescCount = VulkanContext::MaxTextures;
+	const VkDescriptorSetVariableDescriptorCountAllocateInfo variableDescriptorCountAI {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
+		.descriptorSetCount = 1,
+		.pDescriptorCounts = &varDescCount,
+	};
+
+	const VkDescriptorSetAllocateInfo descriptorSetAI {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+		.pNext = &variableDescriptorCountAI,
+		.descriptorPool = context.descriptorPool,
+		.descriptorSetCount = 1,
+		.pSetLayouts = &context.textureDescriptorSetLayout,
+	};
+
+	if (vkAllocateDescriptorSets(context.device, &descriptorSetAI, &context.textureDescriptorSet) != VK_SUCCESS) {
+		LOG_ERROR("Failed to allocate texture descriptor set!");
+		return false;
+	}
+
+	const VkWriteDescriptorSet writeDescriptorSet {
+		.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		.dstSet = context.textureDescriptorSet,
+		.dstBinding = 0,
+		.descriptorCount = VulkanContext::MaxTextures,
+		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.pImageInfo = std::data(context.textureDescriptors),
+	};
+
+	vkUpdateDescriptorSets(context.device, 1, &writeDescriptorSet, 0, nullptr);
 
 	return true;
 }
