@@ -903,9 +903,9 @@ static bool VulkanContext_CreateTextures(VulkanContext& context) {
 			.magFilter = VK_FILTER_LINEAR,
 			.minFilter = VK_FILTER_LINEAR,
 			.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-			.maxLod = (float)texture->numLevels,
 			.anisotropyEnable = VK_TRUE,
 			.maxAnisotropy = 8.0f,
+			.maxLod = (float)texture->numLevels,
 		};
 
 		if (vkCreateSampler(context.device, &samplerCI, nullptr, &context.textures[i].sampler) != VK_SUCCESS) {
