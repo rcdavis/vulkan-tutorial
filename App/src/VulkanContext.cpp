@@ -9,6 +9,7 @@
 #include "ktxvulkan.h"
 #include <vector>
 #include <vulkan/vulkan_core.h>
+#include <slang/slang.h>
 
 static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
 
@@ -25,6 +26,8 @@ static bool VulkanContext_CreateSyncObjects(VulkanContext& context);
 static bool VulkanContext_CreateCommandBuffers(VulkanContext& context);
 
 static bool VulkanContext_CreateTextures(VulkanContext& context);
+
+static bool VulkanContext_CreateShaders(VulkanContext& context);
 
 static bool CheckValidationLayerSupport() {
 	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
@@ -95,6 +98,11 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 
 	if (!VulkanContext_CreateTextures(context)) {
 		LOG_ERROR("Failed to create textures!");
+		return false;
+	}
+
+	if (!VulkanContext_CreateShaders(context)) {
+		LOG_ERROR("Failed to create shaders");
 		return false;
 	}
 
@@ -990,5 +998,9 @@ static bool VulkanContext_CreateTextures(VulkanContext& context) {
 
 	vkUpdateDescriptorSets(context.device, 1, &writeDescriptorSet, 0, nullptr);
 
+	return true;
+}
+
+static bool VulkanContext_CreateShaders(VulkanContext& context) {
 	return true;
 }
