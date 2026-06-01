@@ -53,3 +53,17 @@ FetchContent_Declare(
     GIT_TAG release
 )
 FetchContent_MakeAvailable(tinyobjloader)
+
+# Optional settings
+set(KTX_FEATURE_TESTS OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_TOOLS OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_LOADTEST_APPS OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_GL_UPLOAD OFF CACHE BOOL "" FORCE)
+set(KTX_FEATURE_VK_UPLOAD ON CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    ktx
+    GIT_REPOSITORY https://github.com/KhronosGroup/KTX-Software.git
+    GIT_TAG v4.4.2
+)
+FetchContent_MakeAvailable(ktx)
