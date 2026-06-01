@@ -21,6 +21,14 @@
 			}
 		},
 		{
+			"name": "common-linux-clang",
+			"hidden": true,
+			"inherits": "common-clang",
+			"cacheVariables": {
+				"PROJECT_PLATFORM": "LINUX"
+			}
+		},
+		{
 			"name": "common-gcc",
 			"hidden": true,
 			"inherits": "common",
@@ -32,7 +40,7 @@
 		{
 			"name": "linux-debug-clang",
 			"displayName": "Linux - Debug (Clang)",
-			"inherits": "common-clang",
+			"inherits": "common-linux-clang",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Debug"
 			}
@@ -40,7 +48,7 @@
 		{
 			"name": "linux-release-clang",
 			"displayName": "Linux - Release (Clang)",
-			"inherits": "common-clang",
+			"inherits": "common-linux-clang",
 			"cacheVariables": {
 				"CMAKE_BUILD_TYPE": "Release"
 			}

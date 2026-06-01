@@ -16,6 +16,10 @@ bool Platform_Init(Platform& platform, const char* title, uint32_t width, uint32
 		return false;
 	}
 
+#ifdef PLATFORM_LINUX
+	LOG_INFO("Running on Linux platform");
+#endif
+
 	platform.width = width;
 	platform.height = height;
 

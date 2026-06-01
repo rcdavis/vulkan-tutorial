@@ -34,6 +34,12 @@ else()
     )
 endif()
 
+if (PROJECT_PLATFORM STREQUAL "LINUX")
+    target_compile_definitions(App PUBLIC
+        PLATFORM_LINUX=1
+    )
+endif()
+
 target_include_directories(App PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
