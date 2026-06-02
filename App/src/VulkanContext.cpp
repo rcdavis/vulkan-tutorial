@@ -236,6 +236,7 @@ void VulkanContext_Destroy(VulkanContext& context) {
 	context.physicalDevice = VK_NULL_HANDLE;
 	context.graphicsQueue = VK_NULL_HANDLE;
 	context.graphicsQueueFamily = -1;
+	context.depthImageViewFormat = VK_FORMAT_UNDEFINED;
 }
 
 static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform) {
