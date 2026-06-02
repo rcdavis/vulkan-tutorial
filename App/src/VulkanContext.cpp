@@ -30,7 +30,7 @@ static bool VulkanContext_CreateCommandBuffers(VulkanContext& context);
 
 static bool VulkanContext_CreateTextures(VulkanContext& context);
 
-static bool VulkanContext_CreateShaders(VulkanContext& context);
+static bool VulkanContext_CreateShadersAndGraphicsPipeline(VulkanContext& context);
 
 static bool CheckValidationLayerSupport() {
 	const auto availableLayers = VkUtils::GetInstanceLayerProperties();
@@ -104,8 +104,8 @@ bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
 		return false;
 	}
 
-	if (!VulkanContext_CreateShaders(context)) {
-		LOG_ERROR("Failed to create shaders");
+	if (!VulkanContext_CreateShadersAndGraphicsPipeline(context)) {
+		LOG_ERROR("Failed to create shaders and graphics pipeline");
 		return false;
 	}
 
@@ -173,6 +173,11 @@ void VulkanContext_Destroy(VulkanContext& context) {
 	}
 	context.swapchainImageViews.clear();
 	context.swapchainImages.clear();
+
+	if (context.pipelineLayout != VK_NULL_HANDLE) {
+		vkDestroyPipelineLayout(context.device, context.pipelineLayout, nullptr);
+		context.pipelineLayout = VK_NULL_HANDLE;
+	}
 
 	if (context.textureDescriptorSetLayout != VK_NULL_HANDLE) {
 		vkDestroyDescriptorSetLayout(context.device, context.textureDescriptorSetLayout, nullptr);
@@ -1004,7 +1009,7 @@ static bool VulkanContext_CreateTextures(VulkanContext& context) {
 	return true;
 }
 
-static bool VulkanContext_CreateShaders(VulkanContext& context) {
+static bool VulkanContext_CreateShadersAndGraphicsPipeline(VulkanContext& context) {
 	Slang::ComPtr<slang::IGlobalSession> slangGlobalSession;
 	slang::createGlobalSession(slangGlobalSession.writeRef());
 
@@ -1071,6 +1076,110 @@ static bool VulkanContext_CreateShaders(VulkanContext& context) {
 		LOG_ERROR("Failed to create shader module!");
 		return false;
 	}
+
+	constexpr VkPushConstantRange pushConstantRange {
+		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+		.size = sizeof(VkDeviceAddress),
+	};
+
+	const VkPipelineLayoutCreateInfo pipelineLayoutCI {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.setLayoutCount = 1,
+		.pSetLayouts = &context.textureDescriptorSetLayout,
+		.pushConstantRangeCount = 1,
+		.pPushConstantRanges = &pushConstantRange,
+	};
+
+	if (vkCreatePipelineLayout(context.device, &pipelineLayoutCI, nullptr, &context.pipelineLayout) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create pipeline layout!");
+		return false;
+	}
+
+	constexpr VkVertexInputBindingDescription vertexInputBinding {
+		.binding = 0,
+		.stride = sizeof(Vertex),
+		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+	};
+
+	constexpr std::array<VkVertexInputAttributeDescription, 3> vertexInputAttributes = {
+		VkVertexInputAttributeDescription {
+			.location = 0,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex, pos),
+		},
+		VkVertexInputAttributeDescription {
+			.location = 1,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex, normal),
+		},
+		VkVertexInputAttributeDescription {
+			.location = 2,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = offsetof(Vertex, texCoord),
+		},
+	};
+
+	const VkPipelineVertexInputStateCreateInfo vertexInputStateCI {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		.vertexBindingDescriptionCount = 1,
+		.pVertexBindingDescriptions = &vertexInputBinding,
+		.vertexAttributeDescriptionCount = (uint32_t)std::size(vertexInputAttributes),
+		.pVertexAttributeDescriptions = std::data(vertexInputAttributes),
+	};
+
+	constexpr VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCI {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+	};
+
+	const std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {
+		VkPipelineShaderStageCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_VERTEX_BIT,
+			.module = shaderModule,
+			.pName = "main",
+		},
+		VkPipelineShaderStageCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.module = shaderModule,
+			.pName = "main",
+		},
+	};
+
+	constexpr VkPipelineViewportStateCreateInfo viewportStateCI {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+		.viewportCount = 1,
+		.scissorCount = 1,
+	};
+
+	constexpr std::array<VkDynamicState, 2> dynamicStates = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR,
+	};
+
+	const VkPipelineDynamicStateCreateInfo dynamicStateCI {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.dynamicStateCount = (uint32_t)std::size(dynamicStates),
+		.pDynamicStates = std::data(dynamicStates),
+	};
+
+	constexpr VkPipelineDepthStencilStateCreateInfo depthStencilStateCI {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable = VK_TRUE,
+		.depthWriteEnable = VK_TRUE,
+		.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+	};
+
+	/*VkPipelineRenderingCreateInfo renderingCI {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+		.colorAttachmentCount = 1,
+		.pColorAttachmentFormats = &context.swapchainImageFormat,
+		.depthAttachmentFormat = context.depthImageViewFormat,
+	};*/
 
 	vkDestroyShaderModule(context.device, shaderModule, nullptr);
 
