@@ -57,6 +57,7 @@ struct VulkanContext {
 	VkDescriptorSet textureDescriptorSet = VK_NULL_HANDLE;
 
 	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+	VkPipeline pipeline = VK_NULL_HANDLE;
 
 	VkCommandPool commandPool = VK_NULL_HANDLE;
 	std::array<VkCommandBuffer, MaxFramesInFlight> commandBuffers{};
@@ -72,6 +73,8 @@ struct VulkanContext {
 
 	VkQueue graphicsQueue = VK_NULL_HANDLE;
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;
+
+	VkFormat depthImageViewFormat = VK_FORMAT_UNDEFINED;
 };
 
 bool VulkanContext_Init(VulkanContext& context, Platform& platform);

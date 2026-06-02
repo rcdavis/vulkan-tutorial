@@ -14,6 +14,8 @@
 #include <slang/slang.h>
 #include <slang/slang-com-ptr.h>
 
+static constexpr VkFormat ImageFormat = VK_FORMAT_B8G8R8A8_SRGB;
+
 static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
 
 static bool VulkanContext_CreateDevice(VulkanContext& context);
@@ -173,6 +175,11 @@ void VulkanContext_Destroy(VulkanContext& context) {
 	}
 	context.swapchainImageViews.clear();
 	context.swapchainImages.clear();
+
+	if (context.pipeline != VK_NULL_HANDLE) {
+		vkDestroyPipeline(context.device, context.pipeline, nullptr);
+		context.pipeline = VK_NULL_HANDLE;
+	}
 
 	if (context.pipelineLayout != VK_NULL_HANDLE) {
 		vkDestroyPipelineLayout(context.device, context.pipelineLayout, nullptr);
@@ -523,6 +530,8 @@ static bool VulkanContext_CreateSwapchain(VulkanContext& context, Platform& plat
 		LOG_ERROR("Failed to create depth image view!");
 		return false;
 	}
+
+	context.depthImageViewFormat = depthFormat;
 
 	return true;
 }
@@ -1092,6 +1101,7 @@ static bool VulkanContext_CreateShadersAndGraphicsPipeline(VulkanContext& contex
 
 	if (vkCreatePipelineLayout(context.device, &pipelineLayoutCI, nullptr, &context.pipelineLayout) != VK_SUCCESS) {
 		LOG_ERROR("Failed to create pipeline layout!");
+		vkDestroyShaderModule(context.device, shaderModule, nullptr);
 		return false;
 	}
 
@@ -1174,12 +1184,55 @@ static bool VulkanContext_CreateShadersAndGraphicsPipeline(VulkanContext& contex
 		.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
 	};
 
-	/*VkPipelineRenderingCreateInfo renderingCI {
+	const VkPipelineRenderingCreateInfo renderingCI {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
 		.colorAttachmentCount = 1,
-		.pColorAttachmentFormats = &context.swapchainImageFormat,
+		.pColorAttachmentFormats = &ImageFormat,
 		.depthAttachmentFormat = context.depthImageViewFormat,
-	};*/
+	};
+
+	constexpr VkPipelineColorBlendAttachmentState colorBlendAttachment {
+		.blendEnable = VK_FALSE,
+		.colorWriteMask = 0xF,
+	};
+
+	const VkPipelineColorBlendStateCreateInfo colorBlendStateCI {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		.attachmentCount = 1,
+		.pAttachments = &colorBlendAttachment,
+	};
+
+	constexpr VkPipelineRasterizationStateCreateInfo rasterizationStateCI {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.lineWidth = 1.0f,
+	};
+
+	constexpr VkPipelineMultisampleStateCreateInfo multisampleStateCI {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+	};
+
+	const VkGraphicsPipelineCreateInfo pipelineCI {
+		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+		.pNext = &renderingCI,
+		.stageCount = (uint32_t)std::size(shaderStages),
+		.pStages = std::data(shaderStages),
+		.pVertexInputState = &vertexInputStateCI,
+		.pInputAssemblyState = &inputAssemblyStateCI,
+		.pViewportState = &viewportStateCI,
+		.pRasterizationState = &rasterizationStateCI,
+		.pMultisampleState = &multisampleStateCI,
+		.pDepthStencilState = &depthStencilStateCI,
+		.pColorBlendState = &colorBlendStateCI,
+		.pDynamicState = &dynamicStateCI,
+		.layout = context.pipelineLayout,
+	};
+
+	if (vkCreateGraphicsPipelines(context.device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &context.pipeline) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create graphics pipeline!");
+		vkDestroyShaderModule(context.device, shaderModule, nullptr);
+		return false;
+	}
 
 	vkDestroyShaderModule(context.device, shaderModule, nullptr);
 
