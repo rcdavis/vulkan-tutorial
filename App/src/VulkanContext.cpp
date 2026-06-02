@@ -1015,7 +1015,7 @@ static bool VulkanContext_CreateShaders(VulkanContext& context) {
 		}
 	};
 
-	constexpr std::array<slang::CompilerOptionEntry, 1> slangOptions = {
+	std::array<slang::CompilerOptionEntry, 1> slangOptions = {
 		slang::CompilerOptionEntry {
 			slang::CompilerOptionName::EmitSpirvDirectly,
 			{slang::CompilerOptionValueKind::Int, 1}
