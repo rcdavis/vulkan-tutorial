@@ -74,6 +74,9 @@ struct VulkanContext {
 	VkQueue graphicsQueue = VK_NULL_HANDLE;
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;
 
+	uint32_t currentFrame = 0;
+	uint32_t imageIndex = 0;
+
 	VkFormat depthImageViewFormat = VK_FORMAT_UNDEFINED;
 };
 
