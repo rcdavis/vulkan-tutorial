@@ -3,8 +3,8 @@
 #include "SDL3/SDL_camera.h"
 #include "Utils/Log.h"
 
-#include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/quaternion.hpp"
 
 Application::~Application() {
 	Shutdown();
@@ -84,4 +84,9 @@ void Application::Render() {
 
 	mShaderData.proj = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 32.0f);
 	mShaderData.view = glm::translate(glm::mat4(1.0f), mCamPos);
+	for (size_t i = 0; i < std::size(mObjRotations); i++) {
+		auto instancePos = glm::vec3((float)(i - 1) * 3.0f, 0.0f, 0.0f);
+		mShaderData.model[i] = glm::translate(glm::mat4(1.0f), instancePos) * glm::mat4_cast(glm::quat(mObjRotations[i]));
+	}
+	memcpy(mVulkanContext.shaderDataBuffers[mVulkanContext.currentFrame].allocationInfo.pMappedData, &mShaderData, sizeof(ShaderData));
 }
