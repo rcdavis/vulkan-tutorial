@@ -1,12 +1,9 @@
 #include "Application.h"
 
-#include "SDL3/SDL_camera.h"
 #include "Utils/Log.h"
 
-#include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include <cstdint>
-#include <utility>
 #include <vulkan/vulkan_core.h>
 
 Application::~Application() {
@@ -119,7 +116,7 @@ void Application::Render() {
 			.subresourceRange = {
 				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
 				.levelCount = 1,
-				.layerCount = 1
+				.layerCount = 1,
 			}
 		},
 		VkImageMemoryBarrier2 {
@@ -134,7 +131,7 @@ void Application::Render() {
 			.subresourceRange = {
 				.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
 				.levelCount = 1,
-				.layerCount = 1
+				.layerCount = 1,
 			}
 		}
 	};
@@ -146,4 +143,94 @@ void Application::Render() {
 	};
 
 	vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+
+	const VkRenderingAttachmentInfo colorAttachmentInfo {
+		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+		.imageView = mVulkanContext.swapchainImageViews[mVulkanContext.imageIndex],
+		.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.clearValue {
+			.color = { { 1.0f, 0.0f, 1.0f, 1.0f } }
+		}
+	};
+
+	const VkRenderingAttachmentInfo depthAttachmentInfo {
+		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+		.imageView = mVulkanContext.depthImageView,
+		.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.clearValue {
+			.depthStencil = { 1.0f, 0 }
+		}
+	};
+
+	// Maybe swap extent with platform window size?
+	const VkRenderingInfo renderingInfo {
+		.sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+		.renderArea {
+			.extent = mVulkanContext.swapchainExtent
+		},
+		.layerCount = 1,
+		.colorAttachmentCount = 1,
+		.pColorAttachments = &colorAttachmentInfo,
+		.pDepthAttachment = &depthAttachmentInfo,
+	};
+
+	vkCmdBeginRendering(commandBuffer, &renderingInfo);
+
+	const VkViewport viewport {
+		.x = 0.0f,
+		.y = 0.0f,
+		.width = (float)mVulkanContext.swapchainExtent.width,
+		.height = (float)mVulkanContext.swapchainExtent.height,
+		.minDepth = 0.0f,
+		.maxDepth = 1.0f,
+	};
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+	const VkRect2D scissor {
+		.offset = { 0, 0 },
+		.extent = mVulkanContext.swapchainExtent,
+	};
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVulkanContext.pipeline);
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mVulkanContext.pipelineLayout, 0, 1, &mVulkanContext.textureDescriptorSet, 0, nullptr);
+
+	constexpr VkDeviceSize vOffset = 0;
+	vkCmdBindVertexBuffers(commandBuffer, 0, 1, &mVulkanContext.vertexBuffer, &vOffset);
+	vkCmdBindIndexBuffer(commandBuffer, mVulkanContext.vertexBuffer, mVulkanContext.vertexBufferSize, VK_INDEX_TYPE_UINT16);
+
+	vkCmdPushConstants(commandBuffer, mVulkanContext.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(VkDeviceAddress), &mVulkanContext.shaderDataBuffers[mVulkanContext.currentFrame].bufferDeviceAddress);
+
+	vkCmdDrawIndexed(commandBuffer, mVulkanContext.indexCount, 3, 0, 0, 0);
+	vkCmdEndRendering(commandBuffer);
+
+	const VkImageMemoryBarrier2 presentBarrier {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+		.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+		.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.dstAccessMask = VK_ACCESS_2_NONE,
+		.oldLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+		.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+		.image = mVulkanContext.swapchainImages[mVulkanContext.imageIndex],
+		.subresourceRange = {
+			.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.levelCount = 1,
+			.layerCount = 1,
+		}
+	};
+
+	const VkDependencyInfo barrierPresetDependencyInfo {
+		.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+		.imageMemoryBarrierCount = 1,
+		.pImageMemoryBarriers = &presentBarrier,
+	};
+
+	vkCmdPipelineBarrier2(commandBuffer, &barrierPresetDependencyInfo);
+
+	vkEndCommandBuffer(commandBuffer);
 }

@@ -235,9 +235,11 @@ void VulkanContext_Destroy(VulkanContext& context) {
 
 	context.physicalDevice = VK_NULL_HANDLE;
 	context.graphicsQueue = VK_NULL_HANDLE;
+	context.vertexBufferSize = 0;
 	context.graphicsQueueFamily = -1;
 	context.currentFrame = 0;
 	context.imageIndex = 0;
+	context.indexCount = 0;
 	context.depthImageViewFormat = VK_FORMAT_UNDEFINED;
 }
 
@@ -547,12 +549,13 @@ static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& pl
 		return false;
 	}
 
-	const VkDeviceSize vertexBufferSize = sizeof(Vertex) * vertices.size();
-	const VkDeviceSize indexBufferSize = sizeof(uint16_t) * indices.size();
+	context.vertexBufferSize = sizeof(Vertex) * std::size(vertices);
+	context.indexCount = (uint32_t)std::size(indices);
+	const VkDeviceSize indexBufferSize = sizeof(uint16_t) * std::size(indices);
 
 	const VkBufferCreateInfo vertexBufferCI {
 		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size = vertexBufferSize + indexBufferSize,
+		.size = context.vertexBufferSize + indexBufferSize,
 		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 	};
 
@@ -574,8 +577,8 @@ static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& pl
 		return false;
 	}
 
-	memcpy(vertexBufferAllocInfo.pMappedData, std::data(vertices), vertexBufferSize);
-	memcpy((uint8_t*)vertexBufferAllocInfo.pMappedData + vertexBufferSize, std::data(indices), indexBufferSize);
+	memcpy(vertexBufferAllocInfo.pMappedData, std::data(vertices), context.vertexBufferSize);
+	memcpy((uint8_t*)vertexBufferAllocInfo.pMappedData + context.vertexBufferSize, std::data(indices), indexBufferSize);
 
 	return true;
 }
