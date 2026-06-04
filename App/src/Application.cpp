@@ -5,6 +5,9 @@
 
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/quaternion.hpp"
+#include <cstdint>
+#include <utility>
+#include <vulkan/vulkan_core.h>
 
 Application::~Application() {
 	Shutdown();
@@ -89,4 +92,58 @@ void Application::Render() {
 		mShaderData.model[i] = glm::translate(glm::mat4(1.0f), instancePos) * glm::mat4_cast(glm::quat(mObjRotations[i]));
 	}
 	memcpy(mVulkanContext.shaderDataBuffers[mVulkanContext.currentFrame].allocationInfo.pMappedData, &mShaderData, sizeof(ShaderData));
+
+	VkCommandBuffer commandBuffer = mVulkanContext.commandBuffers[mVulkanContext.currentFrame];
+	vkResetCommandBuffer(commandBuffer, 0);
+
+	constexpr VkCommandBufferBeginInfo cbBeginInfo {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	};
+
+	if (vkBeginCommandBuffer(commandBuffer, &cbBeginInfo) != VK_SUCCESS) {
+		LOG_ERROR("Failed to begin recording command buffer!");
+		return;
+	}
+
+	const std::array<VkImageMemoryBarrier2, 2> outputBarriers {
+		VkImageMemoryBarrier2 {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+			.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.srcAccessMask = VK_ACCESS_2_NONE,
+			.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			.image = mVulkanContext.swapchainImages[mVulkanContext.imageIndex],
+			.subresourceRange = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.levelCount = 1,
+				.layerCount = 1
+			}
+		},
+		VkImageMemoryBarrier2 {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+			.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+			.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+			.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
+			.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+			.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+			.image = mVulkanContext.depthImage,
+			.subresourceRange = {
+				.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+				.levelCount = 1,
+				.layerCount = 1
+			}
+		}
+	};
+
+	const VkDependencyInfo dependencyInfo {
+		.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+		.imageMemoryBarrierCount = (uint32_t)std::size(outputBarriers),
+		.pImageMemoryBarriers = std::data(outputBarriers),
+	};
+
+	vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
 }
