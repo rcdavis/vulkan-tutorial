@@ -11,6 +11,8 @@ namespace VkUtils {
 
 	std::vector<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice device);
 
+	std::vector<VkExtensionProperties> GetDeviceExtensionProperties(VkPhysicalDevice device);
+
 	VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 		VkDebugUtilsMessageTypeFlagsEXT type,

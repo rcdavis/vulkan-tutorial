@@ -233,4 +233,39 @@ void Application::Render() {
 	vkCmdPipelineBarrier2(commandBuffer, &barrierPresetDependencyInfo);
 
 	vkEndCommandBuffer(commandBuffer);
+
+	constexpr VkPipelineStageFlags waitStages = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+	const VkSubmitInfo submitInfo {
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &mVulkanContext.imageAvailableSemaphores[mVulkanContext.currentFrame],
+		.pWaitDstStageMask = &waitStages,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &commandBuffer,
+		.signalSemaphoreCount = 1,
+		.pSignalSemaphores = &mVulkanContext.renderFinishedSemaphores[mVulkanContext.imageIndex],
+	};
+
+	if (vkQueueSubmit(mVulkanContext.graphicsQueue, 1, &submitInfo, mVulkanContext.inFlightFences[mVulkanContext.currentFrame]) != VK_SUCCESS) {
+		LOG_ERROR("Failed to submit draw command buffer!");
+		return;
+	}
+
+	mVulkanContext.currentFrame = (mVulkanContext.currentFrame + 1) % VulkanContext::MaxFramesInFlight;
+
+	const VkPresentInfoKHR presentInfo {
+		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount = 1,
+		.pWaitSemaphores = &mVulkanContext.renderFinishedSemaphores[mVulkanContext.imageIndex],
+		.swapchainCount = 1,
+		.pSwapchains = &mVulkanContext.swapchain,
+		.pImageIndices = &mVulkanContext.imageIndex,
+	};
+
+	result = vkQueuePresentKHR(mVulkanContext.graphicsQueue, &presentInfo);
+	if (result != VK_SUCCESS) {
+		// TODO: Handle swapchain out of date (e.g. window resize)
+		LOG_ERROR("Failed to present swapchain image!");
+		return;
+	}
 }
