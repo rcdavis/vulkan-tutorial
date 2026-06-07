@@ -9,7 +9,6 @@
 #include "ktx.h"
 #include "ktxvulkan.h"
 #include <array>
-#include <optional>
 #include <string>
 #include <vector>
 #include <cstring>
@@ -59,7 +58,7 @@ static bool CheckValidationLayerSupport() {
 	return true;
 }
 
-static bool VulkanContext_CheckDeviceExtensionSupport(VkPhysicalDevice device) {
+static bool CheckDeviceExtensionSupport(VkPhysicalDevice device) {
 	const auto availableExtensions = VkUtils::GetDeviceExtensionProperties(device);
 
 	for (const char* requiredExtension : requiredDeviceExtensions) {
@@ -80,7 +79,7 @@ static bool VulkanContext_CheckDeviceExtensionSupport(VkPhysicalDevice device) {
 	return true;
 }
 
-static bool VulkanContext_CheckRequiredFeatures(VkPhysicalDevice device) {
+static bool CheckRequiredFeatures(VkPhysicalDevice device) {
 	VkPhysicalDeviceVulkan12Features features12 {
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
 	};
@@ -119,7 +118,7 @@ static bool VulkanContext_CheckRequiredFeatures(VkPhysicalDevice device) {
 	return true;
 }
 
-static uint32_t VulkanContext_FindGraphicsPresentQueueFamily(VkPhysicalDevice device, VkInstance instance) {
+static uint32_t FindGraphicsPresentQueueFamily(VkPhysicalDevice device, VkInstance instance) {
 	const auto queueFamilies = VkUtils::GetQueueFamilyProperties(device);
 	for (uint32_t index = 0; index < queueFamilies.size(); ++index) {
 		if (!(queueFamilies[index].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
@@ -385,15 +384,15 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 			continue;
 		}
 
-		if (!VulkanContext_CheckDeviceExtensionSupport(device)) {
+		if (!CheckDeviceExtensionSupport(device)) {
 			continue;
 		}
 
-		if (!VulkanContext_CheckRequiredFeatures(device)) {
+		if (!CheckRequiredFeatures(device)) {
 			continue;
 		}
 
-		auto queueFamily = VulkanContext_FindGraphicsPresentQueueFamily(device, context.instance);
+		auto queueFamily = FindGraphicsPresentQueueFamily(device, context.instance);
 		if (queueFamily == VulkanContext::InvalidQueueFamily) {
 			continue;
 		}
