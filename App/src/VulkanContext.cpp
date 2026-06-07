@@ -19,6 +19,10 @@
 
 static constexpr VkFormat ImageFormat = VK_FORMAT_B8G8R8A8_SRGB;
 
+static constexpr std::array requiredDeviceExtensions = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
+
 static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
 
 static bool VulkanContext_CreateDevice(VulkanContext& context);
@@ -55,10 +59,10 @@ static bool CheckValidationLayerSupport() {
 	return true;
 }
 
-static bool VulkanContext_CheckDeviceExtensionSupport(VkPhysicalDevice device, const std::vector<const char*>& requiredExtensions) {
+static bool VulkanContext_CheckDeviceExtensionSupport(VkPhysicalDevice device) {
 	const auto availableExtensions = VkUtils::GetDeviceExtensionProperties(device);
 
-	for (const char* requiredExtension : requiredExtensions) {
+	for (const char* requiredExtension : requiredDeviceExtensions) {
 		bool found = false;
 		for (const auto& extension : availableExtensions) {
 			if (strcmp(requiredExtension, extension.extensionName) == 0) {
@@ -115,7 +119,7 @@ static bool VulkanContext_CheckRequiredFeatures(VkPhysicalDevice device) {
 	return true;
 }
 
-static std::optional<uint32_t> VulkanContext_FindGraphicsPresentQueueFamily(VkPhysicalDevice device, VkInstance instance) {
+static uint32_t VulkanContext_FindGraphicsPresentQueueFamily(VkPhysicalDevice device, VkInstance instance) {
 	const auto queueFamilies = VkUtils::GetQueueFamilyProperties(device);
 	for (uint32_t index = 0; index < queueFamilies.size(); ++index) {
 		if (!(queueFamilies[index].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
@@ -127,7 +131,7 @@ static std::optional<uint32_t> VulkanContext_FindGraphicsPresentQueueFamily(VkPh
 		}
 	}
 
-	return std::nullopt;
+	return VulkanContext::InvalidQueueFamily;
 }
 
 bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
@@ -368,14 +372,6 @@ static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platf
 }
 
 static bool VulkanContext_CreateDevice(VulkanContext& context) {
-	constexpr std::array requiredDeviceExtensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME
-	};
-
-	VkPhysicalDevice selectedPhysicalDevice = VK_NULL_HANDLE;
-	uint32_t selectedQueueFamily = VulkanContext::InvalidQueueFamily;
-	bool foundDiscrete = false;
-
 	const auto devices = VkUtils::GetPhysicalDevices(context.instance);
 	for (const auto& device : devices) {
 		VkPhysicalDeviceProperties2 deviceProps {
@@ -389,7 +385,7 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 			continue;
 		}
 
-		if (!VulkanContext_CheckDeviceExtensionSupport(device, std::vector<const char*>(std::begin(requiredDeviceExtensions), std::end(requiredDeviceExtensions)))) {
+		if (!VulkanContext_CheckDeviceExtensionSupport(device)) {
 			continue;
 		}
 
@@ -398,32 +394,14 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 		}
 
 		auto queueFamily = VulkanContext_FindGraphicsPresentQueueFamily(device, context.instance);
-		if (!queueFamily.has_value()) {
+		if (queueFamily == VulkanContext::InvalidQueueFamily) {
 			continue;
 		}
 
-		if (deviceProps.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-			context.physicalDevice = device;
-			selectedQueueFamily = queueFamily.value();
-			foundDiscrete = true;
-			break;
-		}
-
-		if (!foundDiscrete && selectedPhysicalDevice == VK_NULL_HANDLE) {
-			selectedPhysicalDevice = device;
-			selectedQueueFamily = queueFamily.value();
-		}
+		context.physicalDevice = device;
+		context.graphicsQueueFamily = queueFamily;
+		break;
 	}
-
-	if (context.physicalDevice == VK_NULL_HANDLE) {
-		if (selectedPhysicalDevice == VK_NULL_HANDLE) {
-			LOG_ERROR("Failed to find suitable physical device with required extensions and features!");
-			return false;
-		}
-		context.physicalDevice = selectedPhysicalDevice;
-	}
-
-	context.graphicsQueueFamily = selectedQueueFamily;
 
 	if (context.graphicsQueueFamily == VulkanContext::InvalidQueueFamily) {
 		LOG_ERROR("Failed to find suitable queue family with graphics and presentation support!");
