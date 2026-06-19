@@ -29,27 +29,24 @@ bool Mesh_LoadFromOBJ(const char* filename, std::vector<Vertex>& outVertices, st
 	outIndices.clear();
 
 	for (const auto& shape : shapes) {
-		for (size_t i = 0; i < shape.mesh.indices.size(); i += 3) {
+		for (const auto& index : shape.mesh.indices) {
 			Vertex vertex;
 
-			const auto& idx = shape.mesh.indices[i];
 			vertex.pos = glm::vec3(
-				attrib.vertices[3 * idx.vertex_index + 0],
-				-attrib.vertices[3 * idx.vertex_index + 1],
-				attrib.vertices[3 * idx.vertex_index + 2]
+				attrib.vertices[3 * index.vertex_index + 0],
+				-attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2]
 			);
 
-			const auto& normal_idx = shape.mesh.indices[i + 1];
 			vertex.normal = glm::vec3(
-				attrib.normals[3 * normal_idx.normal_index + 0],
-				-attrib.normals[3 * normal_idx.normal_index + 1],
-				attrib.normals[3 * normal_idx.normal_index + 2]
+				attrib.normals[3 * index.normal_index + 0],
+				-attrib.normals[3 * index.normal_index + 1],
+				attrib.normals[3 * index.normal_index + 2]
 			);
 
-			const auto& texcoord_idx = shape.mesh.indices[i + 2];
 			vertex.texCoord = glm::vec2(
-				attrib.texcoords[2 * texcoord_idx.texcoord_index + 0],
-				1.0f - attrib.texcoords[2 * texcoord_idx.texcoord_index + 1]
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
 			);
 
 			outVertices.push_back(vertex);
