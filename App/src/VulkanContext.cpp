@@ -5,16 +5,22 @@
 #include "Platform.h"
 #include "Mesh.h"
 
+#include "SDL3/SDL_vulkan.h"
 #include "ktx.h"
 #include "ktxvulkan.h"
 #include <array>
-#include <vector>
 #include <string>
+#include <vector>
+#include <cstring>
 #include <vulkan/vulkan_core.h>
 #include <slang/slang.h>
 #include <slang/slang-com-ptr.h>
 
 static constexpr VkFormat ImageFormat = VK_FORMAT_B8G8R8A8_SRGB;
+
+static constexpr std::array requiredDeviceExtensions = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
 
 static bool VulkanContext_CreateInstance(VulkanContext& context, Platform& platform);
 
@@ -50,6 +56,81 @@ static bool CheckValidationLayerSupport() {
 	}
 
 	return true;
+}
+
+static bool CheckDeviceExtensionSupport(VkPhysicalDevice device) {
+	const auto availableExtensions = VkUtils::GetDeviceExtensionProperties(device);
+
+	for (const char* requiredExtension : requiredDeviceExtensions) {
+		bool found = false;
+		for (const auto& extension : availableExtensions) {
+			if (strcmp(requiredExtension, extension.extensionName) == 0) {
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			LOG_WARN("Physical device is missing required extension: {}", requiredExtension);
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static bool CheckRequiredFeatures(VkPhysicalDevice device) {
+	VkPhysicalDeviceVulkan12Features features12 {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+	};
+
+	VkPhysicalDeviceVulkan13Features features13 {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+		.pNext = &features12,
+	};
+
+	VkPhysicalDeviceFeatures2 features2 {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+		.pNext = &features13,
+	};
+
+	vkGetPhysicalDeviceFeatures2(device, &features2);
+
+	if (features2.features.samplerAnisotropy != VK_TRUE) {
+		LOG_WARN("Physical device does not support sampler anisotropy");
+		return false;
+	}
+
+	if (features12.bufferDeviceAddress != VK_TRUE ||
+		features12.descriptorIndexing != VK_TRUE ||
+		features12.shaderSampledImageArrayNonUniformIndexing != VK_TRUE ||
+		features12.descriptorBindingVariableDescriptorCount != VK_TRUE ||
+		features12.runtimeDescriptorArray != VK_TRUE) {
+		LOG_WARN("Physical device does not support one or more required Vulkan 1.2 features");
+		return false;
+	}
+
+	if (features13.synchronization2 != VK_TRUE || features13.dynamicRendering != VK_TRUE) {
+		LOG_WARN("Physical device does not support Vulkan 1.3 features synchronization2 or dynamicRendering");
+		return false;
+	}
+
+	return true;
+}
+
+static uint32_t FindGraphicsPresentQueueFamily(VkPhysicalDevice device, VkInstance instance) {
+	const auto queueFamilies = VkUtils::GetQueueFamilyProperties(device);
+	for (uint32_t index = 0; index < queueFamilies.size(); ++index) {
+		if (!(queueFamilies[index].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+			continue;
+		}
+
+		if (SDL_Vulkan_GetPresentationSupport(instance, device, index)) {
+			return index;
+		}
+	}
+
+	return VulkanContext::InvalidQueueFamily;
 }
 
 bool VulkanContext_Init(VulkanContext& context, Platform& platform) {
@@ -235,7 +316,11 @@ void VulkanContext_Destroy(VulkanContext& context) {
 
 	context.physicalDevice = VK_NULL_HANDLE;
 	context.graphicsQueue = VK_NULL_HANDLE;
-	context.graphicsQueueFamily = -1;
+	context.vertexBufferSize = 0;
+	context.graphicsQueueFamily = VulkanContext::InvalidQueueFamily;
+	context.currentFrame = 0;
+	context.imageIndex = 0;
+	context.indexCount = 0;
 	context.depthImageViewFormat = VK_FORMAT_UNDEFINED;
 }
 
@@ -294,34 +379,31 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 
 		vkGetPhysicalDeviceProperties2(device, &deviceProps);
 
-		if (deviceProps.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-			LOG_INFO("Selected physical device: {} (discrete GPU)", deviceProps.properties.deviceName);
-			context.physicalDevice = device;
-			break;
+		if (deviceProps.properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+			deviceProps.properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
+			continue;
 		}
 
-		if (deviceProps.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
-			LOG_INFO("Selected physical device: {} (integrated GPU)", deviceProps.properties.deviceName);
-			context.physicalDevice = device;
-			break;
+		if (!CheckDeviceExtensionSupport(device)) {
+			continue;
 		}
-	}
 
-	if (context.physicalDevice == VK_NULL_HANDLE) {
-		LOG_ERROR("Failed to find suitable physical device!");
-		return false;
-	}
-
-	const auto queueFamilies = VkUtils::GetQueueFamilyProperties(context.physicalDevice);
-	for (size_t i = 0; i < std::size(queueFamilies); i++) {
-		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-			context.graphicsQueueFamily = (uint32_t)i;
-			break;
+		if (!CheckRequiredFeatures(device)) {
+			continue;
 		}
+
+		auto queueFamily = FindGraphicsPresentQueueFamily(device, context.instance);
+		if (queueFamily == VulkanContext::InvalidQueueFamily) {
+			continue;
+		}
+
+		context.physicalDevice = device;
+		context.graphicsQueueFamily = queueFamily;
+		break;
 	}
 
 	if (context.graphicsQueueFamily == VulkanContext::InvalidQueueFamily) {
-		LOG_ERROR("Failed to find suitable queue family with graphics support!");
+		LOG_ERROR("Failed to find suitable queue family with graphics and presentation support!");
 		return false;
 	}
 
@@ -353,17 +435,13 @@ static bool VulkanContext_CreateDevice(VulkanContext& context) {
 		.samplerAnisotropy = VK_TRUE
 	};
 
-	constexpr std::array deviceExtensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME
-	};
-
 	const VkDeviceCreateInfo createInfo {
 		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 		.pNext = &deviceFeatures13,
 		.queueCreateInfoCount = 1,
 		.pQueueCreateInfos = &queueCreateInfo,
-		.enabledExtensionCount = (uint32_t)std::size(deviceExtensions),
-		.ppEnabledExtensionNames = std::data(deviceExtensions),
+		.enabledExtensionCount = (uint32_t)std::size(requiredDeviceExtensions),
+		.ppEnabledExtensionNames = std::data(requiredDeviceExtensions),
 		.pEnabledFeatures = &enabledFeatures
 	};
 
@@ -545,12 +623,13 @@ static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& pl
 		return false;
 	}
 
-	const VkDeviceSize vertexBufferSize = sizeof(Vertex) * vertices.size();
-	const VkDeviceSize indexBufferSize = sizeof(uint16_t) * indices.size();
+	context.vertexBufferSize = sizeof(Vertex) * std::size(vertices);
+	context.indexCount = (uint32_t)std::size(indices);
+	const VkDeviceSize indexBufferSize = sizeof(uint16_t) * std::size(indices);
 
 	const VkBufferCreateInfo vertexBufferCI {
 		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size = vertexBufferSize + indexBufferSize,
+		.size = context.vertexBufferSize + indexBufferSize,
 		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 	};
 
@@ -572,8 +651,8 @@ static bool VulkanContext_CreateMeshBuffers(VulkanContext& context, Platform& pl
 		return false;
 	}
 
-	memcpy(vertexBufferAllocInfo.pMappedData, std::data(vertices), vertexBufferSize);
-	memcpy((uint8_t*)vertexBufferAllocInfo.pMappedData + vertexBufferSize, std::data(indices), indexBufferSize);
+	memcpy(vertexBufferAllocInfo.pMappedData, std::data(vertices), context.vertexBufferSize);
+	memcpy((uint8_t*)vertexBufferAllocInfo.pMappedData + context.vertexBufferSize, std::data(indices), indexBufferSize);
 
 	return true;
 }
@@ -596,9 +675,8 @@ static bool VulkanContext_CreateShaderDataBuffers(VulkanContext& context) {
 			.usage = VMA_MEMORY_USAGE_AUTO,
 		};
 
-		VmaAllocationInfo bufferAllocInfo {};
 		if (vmaCreateBuffer(context.allocator, &bufferCI, &bufferAllocCI,
-			&context.shaderDataBuffers[i].buffer, &context.shaderDataBuffers[i].allocation, &bufferAllocInfo) != VK_SUCCESS
+			&context.shaderDataBuffers[i].buffer, &context.shaderDataBuffers[i].allocation, &context.shaderDataBuffers[i].allocationInfo) != VK_SUCCESS
 		) {
 			LOG_ERROR("Failed to create shader data buffer {}!", i);
 			return false;

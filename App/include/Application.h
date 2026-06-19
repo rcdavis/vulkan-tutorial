@@ -2,6 +2,8 @@
 
 #include "Platform.h"
 #include "VulkanContext.h"
+#include "ShaderData.h"
+#include "glm/fwd.hpp"
 
 class Application {
 public:
@@ -24,6 +26,16 @@ private:
 private:
 	Platform mPlatform;
 	VulkanContext mVulkanContext;
+	ShaderData mShaderData;
+
+	std::array<glm::vec3, 3> mObjRotations = {
+		glm::vec3(0.0f, 0.0f, 0.0f),
+		glm::vec3(0.0f, 0.0f, 0.0f),
+		glm::vec3(0.0f, 0.0f, 0.0f)
+	};
+
+	glm::vec3 mCamPos = glm::vec3(0.0f, 0.0f, -6.0f);
 
 	bool mIsRunning = false;
+	bool mUpdateSwapchain = false;
 };

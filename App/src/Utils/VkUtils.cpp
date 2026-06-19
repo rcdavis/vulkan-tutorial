@@ -36,6 +36,16 @@ namespace VkUtils {
 		return properties;
 	}
 
+	std::vector<VkExtensionProperties> GetDeviceExtensionProperties(VkPhysicalDevice device) {
+		uint32_t count = 0;
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr);
+
+		std::vector<VkExtensionProperties> extensions(count);
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &count, std::data(extensions));
+
+		return extensions;
+	}
+
 	VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 		VkDebugUtilsMessageTypeFlagsEXT type,

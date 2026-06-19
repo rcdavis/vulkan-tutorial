@@ -71,8 +71,15 @@ struct VulkanContext {
 	std::array<VkSemaphore, MaxFramesInFlight> imageAvailableSemaphores{};
 	std::array<VkFence, MaxFramesInFlight> inFlightFences{};
 
+	VkDeviceSize vertexBufferSize = 0;
+
 	VkQueue graphicsQueue = VK_NULL_HANDLE;
 	uint32_t graphicsQueueFamily = InvalidQueueFamily;
+
+	uint32_t currentFrame = 0;
+	uint32_t imageIndex = 0;
+
+	uint32_t indexCount = 0;
 
 	VkFormat depthImageViewFormat = VK_FORMAT_UNDEFINED;
 };
