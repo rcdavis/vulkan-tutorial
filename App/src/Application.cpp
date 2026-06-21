@@ -1,5 +1,8 @@
 #include "Application.h"
 
+#include "SDL3/SDL_events.h"
+#include "SDL3/SDL_keycode.h"
+#include "SDL3/SDL_timer.h"
 #include "Utils/Log.h"
 
 #include "glm/gtc/quaternion.hpp"
@@ -49,10 +52,39 @@ void Application::MainLoop() {
 	SDL_Event event;
 	SDL_zero(event);
 
+	auto lastTime = SDL_GetTicks();
+
 	while (mIsRunning) {
+		const float elapsedTime = (SDL_GetTicks() - lastTime) / 1'000.0f;
+		lastTime = SDL_GetTicks();
+
 		while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_EVENT_QUIT) {
 				mIsRunning = false;
+				break;
+			}
+
+			if (event.type == SDL_EVENT_MOUSE_MOTION) {
+				if (event.button.button == SDL_BUTTON_LEFT) {
+					mObjRotations[mShaderData.selected].x -= (float)event.motion.yrel * elapsedTime;
+					mObjRotations[mShaderData.selected].y += (float)event.motion.xrel * elapsedTime;
+				}
+			}
+
+			if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+				mCamPos.z += (float)event.wheel.y * elapsedTime * 10.0f;
+			}
+
+			if (event.type == SDL_EVENT_KEY_DOWN) {
+				if (event.key.key == SDLK_PLUS || event.key.key == SDLK_KP_PLUS) {
+					mShaderData.selected = (mShaderData.selected < 2) ? mShaderData.selected + 1 : 0;
+				} else if (event.key.key == SDLK_MINUS || event.key.key == SDLK_KP_MINUS) {
+					mShaderData.selected = (mShaderData.selected > 0) ? mShaderData.selected - 1 : 2;
+				}
+			}
+
+			if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+				mUpdateSwapchain = true;
 			}
 		}
 
