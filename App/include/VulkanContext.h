@@ -87,3 +87,5 @@ struct VulkanContext {
 bool VulkanContext_Init(VulkanContext& context, Platform& platform);
 
 void VulkanContext_Destroy(VulkanContext& context);
+
+bool VulkanContext_RecreateSwapchain(VulkanContext& context, Platform& platform);
