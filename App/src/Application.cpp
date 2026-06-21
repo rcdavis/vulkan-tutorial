@@ -305,7 +305,6 @@ void Application::Render() {
 
 	result = vkQueuePresentKHR(mVulkanContext.graphicsQueue, &presentInfo);
 	if (result != VK_SUCCESS) {
-		// TODO: Handle swapchain out of date (e.g. window resize)
 		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 			LOG_INFO("Swapchain is out of date");
 			mUpdateSwapchain = true;
