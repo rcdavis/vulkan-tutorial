@@ -9,6 +9,8 @@
 #include "ktx.h"
 #include "ktxvulkan.h"
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <cstring>
@@ -1314,6 +1316,169 @@ static bool VulkanContext_CreateShadersAndGraphicsPipeline(VulkanContext& contex
 	}
 
 	vkDestroyShaderModule(context.device, shaderModule, nullptr);
+
+	return true;
+}
+
+bool VulkanContext_RecreateSwapchain(VulkanContext& context, Platform& platform) {
+	if (vkDeviceWaitIdle(context.device) != VK_SUCCESS) {
+		LOG_ERROR("Failed to wait for device");
+		return false;
+	}
+
+	VkSurfaceCapabilitiesKHR surfaceCapabilities {};
+	if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context.physicalDevice, context.surface,
+		&surfaceCapabilities) != VK_SUCCESS
+	) {
+		LOG_ERROR("Failed to get physical device surface capabilities");
+		return false;
+	}
+
+	context.swapchainExtent = surfaceCapabilities.currentExtent;
+	if (context.swapchainExtent.width == 0xFFFFFFFF) {
+		context.swapchainExtent = {
+			.width = std::clamp(platform.width, surfaceCapabilities.minImageExtent.width, surfaceCapabilities.maxImageExtent.width),
+			.height = std::clamp(platform.height, surfaceCapabilities.minImageExtent.height, surfaceCapabilities.maxImageExtent.height)
+		};
+	}
+
+	constexpr VkFormat desiredFormat = VK_FORMAT_B8G8R8A8_SRGB;
+	const VkSwapchainCreateInfoKHR createInfo {
+		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+		.surface = context.surface,
+		.minImageCount = surfaceCapabilities.minImageCount,
+		.imageFormat = desiredFormat,
+		.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+		.imageExtent = context.swapchainExtent,
+		.imageArrayLayers = 1,
+		.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+		.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		.preTransform = surfaceCapabilities.currentTransform,
+		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+		.presentMode = VK_PRESENT_MODE_FIFO_KHR,
+		.oldSwapchain = context.swapchain,
+	};
+
+	if (vkCreateSwapchainKHR(context.device, &createInfo, nullptr, &context.swapchain) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create new swapchain");
+		return false;
+	}
+
+	for (VkImageView imageView : context.swapchainImageViews) {
+		vkDestroyImageView(context.device, imageView, nullptr);
+	}
+
+	uint32_t imageCount = 0;
+	vkGetSwapchainImagesKHR(context.device, context.swapchain, &imageCount, nullptr);
+
+	context.swapchainImages.resize(imageCount);
+	vkGetSwapchainImagesKHR(context.device, context.swapchain, &imageCount, std::data(context.swapchainImages));
+
+	context.swapchainImageViews.resize(imageCount);
+	for (uint32_t i = 0; i < imageCount; ++i) {
+		const VkImageViewCreateInfo viewCI {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.image = context.swapchainImages[i],
+			.viewType = VK_IMAGE_VIEW_TYPE_2D,
+			.format = desiredFormat,
+			.subresourceRange = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.levelCount = 1,
+				.layerCount = 1,
+			},
+		};
+
+		if (vkCreateImageView(context.device, &viewCI, nullptr, &context.swapchainImageViews[i]) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create image view");
+			return false;
+		}
+	}
+
+	for (VkSemaphore semaphore : context.renderFinishedSemaphores) {
+		vkDestroySemaphore(context.device, semaphore, nullptr);
+	}
+
+	constexpr VkSemaphoreCreateInfo semaphoreCI {
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+	};
+
+	context.renderFinishedSemaphores.resize(imageCount);
+	for (VkSemaphore& semaphore : context.renderFinishedSemaphores) {
+		if (vkCreateSemaphore(context.device, &semaphoreCI, nullptr, &semaphore) != VK_SUCCESS) {
+			LOG_ERROR("Failed to create semaphore");
+			return false;
+		}
+	}
+
+	vkDestroySwapchainKHR(context.device, createInfo.oldSwapchain, nullptr);
+	vmaDestroyImage(context.allocator, context.depthImage, context.depthImageAllocation);
+	vkDestroyImageView(context.device, context.depthImageView, nullptr);
+
+	constexpr std::array<VkFormat, 2> depthFormatList = {
+		VK_FORMAT_D32_SFLOAT_S8_UINT,
+		VK_FORMAT_D24_UNORM_S8_UINT
+	};
+	VkFormat depthFormat = VK_FORMAT_UNDEFINED;
+	for (VkFormat format : depthFormatList) {
+		VkFormatProperties2 props {
+			 .sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2,
+		};
+
+		vkGetPhysicalDeviceFormatProperties2(context.physicalDevice, format, &props);
+		if (props.formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+			depthFormat = format;
+			break;
+		}
+	}
+
+	if (depthFormat == VK_FORMAT_UNDEFINED) {
+		LOG_ERROR("Failed to find a depth format!");
+		return false;
+	}
+
+	const VkImageCreateInfo depthImageCI {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+		.imageType = VK_IMAGE_TYPE_2D,
+		.format = depthFormat,
+		.extent = VkExtent3D {
+			.width = context.swapchainExtent.width,
+			.height = context.swapchainExtent.height,
+			.depth = 1,
+		},
+		.mipLevels = 1,
+		.arrayLayers = 1,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.tiling = VK_IMAGE_TILING_OPTIMAL,
+		.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+	};
+
+	constexpr VmaAllocationCreateInfo allocCI {
+		.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT,
+		.usage = VMA_MEMORY_USAGE_AUTO,
+	};
+
+	if (vmaCreateImage(context.allocator, &depthImageCI, &allocCI, &context.depthImage, &context.depthImageAllocation, nullptr) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create depth image");
+		return false;
+	}
+
+	const VkImageViewCreateInfo viewCI {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.image = context.depthImage,
+		.viewType = VK_IMAGE_VIEW_TYPE_2D,
+		.format = depthFormat,
+		.subresourceRange = {
+			.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+			.levelCount = 1,
+			.layerCount = 1,
+		},
+	};
+
+	if (vkCreateImageView(context.device, &viewCI, nullptr, &context.depthImageView) != VK_SUCCESS) {
+		LOG_ERROR("Failed to create depth image view");
+		return false;
+	}
 
 	return true;
 }

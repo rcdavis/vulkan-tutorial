@@ -5,6 +5,7 @@
 #include "SDL3/SDL_timer.h"
 #include "Utils/Log.h"
 
+#include "VulkanContext.h"
 #include "glm/gtc/quaternion.hpp"
 #include <cstdint>
 #include <vulkan/vulkan_core.h>
@@ -85,7 +86,15 @@ void Application::MainLoop() {
 
 			if (event.type == SDL_EVENT_WINDOW_RESIZED) {
 				mUpdateSwapchain = true;
+				mPlatform.width = event.window.data1;
+				mPlatform.height = event.window.data2;
 			}
+		}
+
+		if (mUpdateSwapchain) {
+			LOG_INFO("Recreating swapchain...");
+			VulkanContext_RecreateSwapchain(mVulkanContext, mPlatform);
+			mUpdateSwapchain = false;
 		}
 
 		Render();
@@ -297,7 +306,15 @@ void Application::Render() {
 	result = vkQueuePresentKHR(mVulkanContext.graphicsQueue, &presentInfo);
 	if (result != VK_SUCCESS) {
 		// TODO: Handle swapchain out of date (e.g. window resize)
-		LOG_ERROR("Failed to present swapchain image!");
-		return;
+		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+			LOG_INFO("Swapchain is out of date");
+			mUpdateSwapchain = true;
+		} else if (result == VK_SUBOPTIMAL_KHR) {
+			LOG_INFO("Swapchain is sub-optimal");
+			mUpdateSwapchain = true;
+		} else {
+			LOG_ERROR("Failed to present swapchain image!");
+			return;
+		}
 	}
 }
